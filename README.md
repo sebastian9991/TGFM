@@ -18,6 +18,7 @@ pip install uv
 
 ```sh
 # Clone the repo
+git clone git@github.com:sebastian9991/TGFM.git
 
 # Enter the repo directory
 cd TGFM
