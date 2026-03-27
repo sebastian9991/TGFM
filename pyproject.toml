@@ -1,0 +1,15 @@
+[project]
+name = "tgfm"
+version = "0.1.0"
+description = "Text-Graph Foundation Model."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pre-commit>=4.5.1",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pytest>=9.0.2",
+]
