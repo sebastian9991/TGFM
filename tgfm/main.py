@@ -1,6 +1,6 @@
-def main():
-    print("Hello from tgfm!")
+def main() -> None:
+    print('Hello from tgfm!')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

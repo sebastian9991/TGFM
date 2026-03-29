@@ -5,11 +5,84 @@ description = "Text-Graph Foundation Model."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "numpy>=2.4.4",
     "pre-commit>=4.5.1",
+    "torch>=2.11.0",
 ]
 
 [dependency-groups]
 dev = [
     "mypy>=1.19.1",
     "pytest>=9.0.2",
+]
+
+[tool.flit.module]
+name = "tgfm"
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.mypy]
+files = ['tgfm']
+exclude = ['^test/']
+install_types = true
+non_interactive = true
+ignore_missing_imports = true
+show_error_codes = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+skip = [".gitignore", "__init__.py"]
+
+[tool.ruff]
+exclude = ['test']
+
+[tool.ruff.lint]
+select = [
+    "D",  # pydocstyle
+]
+ignore = [
+    "D100",  # Ignore "Missing docstring in public module"
+    "D101",  # Ignore "Missing docstring in public class"
+    "D102",  # Ignore "Missing docstring in public method"
+    "D103",  # Ignore "Missing docstring in public function"
+    "D104",  # Ignore "Missing docstring in public package"
+    "D105",  # Ignore "Missing docstring in magic method"
+    "D107",  # Ignore "Missing docstring in __init__"
+    "D205",  # Ignore "blank line required between summary line and description"
+]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--capture=no",
+    "--color=yes",
+    "-vvv",
+]
+markers = [
+    "integration: marks integration tests (deselect with '-m \"not integration\"')"
+]
+
+[tool.coverage.run]
+source = ["tgfm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "pass",
+    "raise NotImplementedError",
+    "register_parameter",
+    "torch.cuda.is_available",
 ]

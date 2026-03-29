@@ -77,3 +77,4 @@ repos:
     hooks:
       - id: mypy
         name: mypy
+        exclude: ^test/
