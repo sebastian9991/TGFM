@@ -334,7 +334,7 @@ wheels = [
 [[package]]
 name = "tgfm"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "pre-commit" },
 ]
