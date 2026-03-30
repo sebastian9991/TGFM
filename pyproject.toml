@@ -13,6 +13,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "datatrove[all]>=0.8.0",
     "mypy>=1.19.1",
     "pyarrow>=23.0.1",
     "pytest>=9.0.2",
