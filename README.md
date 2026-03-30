@@ -28,4 +28,15 @@ uv sync
 
 # The isolated env is .venv, you may source it like so:
 source .venv/bin/activate
+
+
+
+```
+
+### Text Processing
+
+This project uses [nemo-curator](https://github.com/NVIDIA-NeMo/Curator) to process the CrediBench text into a usable and quality format for pre-training. Currently, nemo-curator fails with UV project API to define the project dependencies. Currently only installing packages into the active enironment works:
+
+```sh
+uv pip install "nemo-curator[text_cuda12]"
 ```
