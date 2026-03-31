@@ -5,14 +5,16 @@ description = "Text-Graph Foundation Model."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy>=2.4.4",
+    "numpy>=2.2.6",
     "pre-commit>=4.5.1",
-    "torch>=2.11.0",
+    "torch>=2.4.1",
 ]
 
 [dependency-groups]
 dev = [
+    "cmake>=3.27,<4.0",
     "mypy>=1.19.1",
+    "nemo-curator[text-cuda12]>=1.1.0",
     "pytest>=9.0.2",
 ]
 
@@ -20,8 +22,12 @@ dev = [
 name = "tgfm"
 
 [build-system]
-requires = ["flit_core >=3.2,<4", "wheel", "pip"]
+requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
+
+
+
+
 
 [tool.mypy]
 files = ['tgfm']
@@ -35,7 +41,6 @@ warn_unused_configs = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
-
 
 [tool.isort]
 multi_line_output = 3
