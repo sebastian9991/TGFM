@@ -58,7 +58,7 @@ def run_text_cleaning() -> None:
     file_paths = scratch / args.file_paths
 
     output_path = scratch / args.output_path
-    output_path.mkdir(parents=True, exists_ok=True)
+    output_path.mkdir(parents=True, exist_ok=True)
     try:
         pipeline = Pipeline(name='Text cleaning pipeline.')
 
