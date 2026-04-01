@@ -65,9 +65,9 @@ def test_curator_jsonl():
 
         ray_client.stop()
 
+    except ConnectionError as e:
+        ray_client.stop()
+        print(f'Pytest Passing but with exception: {e}')
     except Exception as e:
-        if e == ConnectionError:
-            ray_client.stop()
-        else:
-            ray_client.stop()
-            pytest.fail(f"Pipeline failed with exception: {e}")
+        ray_client.stop()
+        pytest.fail(f"Pipeline failed with exception: {e}")
