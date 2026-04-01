@@ -27,6 +27,8 @@ def convert_to_datatrove_format(file_path: Path | str) -> pd.DataFrame:
     """
     df = pd.read_parquet(file_path)
 
+    logging.info(f'Current format: {df.head()}')
+
     def concatenate_texts(pages: np.ndarray) -> str:
         if not isinstance(pages, (np.ndarray, list)):
             return ''
