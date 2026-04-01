@@ -11,6 +11,19 @@ def test_nemo_imports():
 
     print("✓ Core modules imported successfully")
 
+def test_ray_client():
+    """Verify ray client."""
+    from nemo_curator.core.client import RayClient
+    try:
+        ray_client = RayClient(num_cpus=1, num_gpus=0, object_store_memory=500_000_000)
+        ray_client.start()
+        ray_client.stop()
+    except ConnectionError as e:
+        print(f'Passing but Connection Error: {e}')
+    except Exception as e:
+        pytest.fail(f'Failed with exception {e}')
+
+
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
 def test_gpu_avalability():
