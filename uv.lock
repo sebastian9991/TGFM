@@ -4870,6 +4870,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pre-commit" },
     { name = "torch" },
+    { name = "tqdm" },
 ]
 
 [package.dev-dependencies]
@@ -4885,6 +4886,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "torch", specifier = ">=2.4.1" },
+    { name = "tqdm", specifier = ">=4.67.3" },
 ]
 
 [package.metadata.requires-dev]

@@ -8,6 +8,7 @@ dependencies = [
     "numpy>=2.2.6",
     "pre-commit>=4.5.1",
     "torch>=2.4.1",
+    "tqdm>=4.67.3",
 ]
 
 [dependency-groups]
