@@ -1,3 +1,4 @@
+import pytest
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
 from nemo_curator.stages.text.filters import (
@@ -64,5 +65,6 @@ def test_curator_jsonl():
 
         ray_client.stop()
 
-    except:
+    except Exception as e:
         ray_client.stop()
+        pytest.fail(f"Pipeline failed with exception: {e}")
