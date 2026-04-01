@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_scratch
 
 
@@ -57,6 +58,7 @@ def convert_to_datatrove_format(file_path: Path | str) -> pd.DataFrame:
 
 
 def main() -> None:
+    setup_logging('convert_to_correct_parquet_format.log')
     scratch = get_scratch()
     source_dir = scratch / 'credibench_text' / 'dec'
     output_dir = source_dir / 'curator_format'
