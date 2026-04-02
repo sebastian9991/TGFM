@@ -4,6 +4,8 @@ import time
 
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
+from nemo_curator.stages.text.filters.heuristics.string import WordCountFilter
+from nemo_curator.stages.text.filters.score_filter import ScoreFilter
 from nemo_curator.stages.text.io.reader import ParquetReader
 from nemo_curator.stages.text.io.writer import ParquetWriter
 from nemo_curator.stages.text.modifiers import (
@@ -82,12 +84,12 @@ def run_text_cleaning() -> None:
         )
 
         # # TODO: Do we need this? Likely we do not
-        # word_filter = ScoreFilter(
-        #     filter_obj=WordCountFilter(min_words=50, max_words=1000),
-        #     text_field='wet_record_txt',
-        # )
+        word_filter = ScoreFilter(
+            filter_obj=WordCountFilter(min_words=50, max_words=1000),
+            text_field='wet_record_txt',
+        )
 
-        # pipeline.add_stage(word_filter)
+        pipeline.add_stage(word_filter)
 
         pipeline.add_stage(ParquetWriter(str(output_path)))
         pipeline.run()
