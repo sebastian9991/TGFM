@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
@@ -15,6 +17,8 @@ from tgfm.utils.path import get_root_dir
 def test_curator_jsonl():
     ray_client = RayClient(num_cpus=8, num_gpus=0, object_store_memory=500_000_000)
     ray_client.start()
+    time.sleep(10)
+
 
     try:
         root = get_root_dir()
