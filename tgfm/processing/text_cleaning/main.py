@@ -1,6 +1,7 @@
 import argparse
 import logging
 import time
+from pathlib import Path
 
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
@@ -63,6 +64,8 @@ def run_text_cleaning() -> None:
     output_path.mkdir(parents=True, exist_ok=True)
     try:
         pipeline = Pipeline(name='Text cleaning pipeline.')
+        file_paths = list(Path(scratch / args.file_paths).glob('*.parquet'))
+        file_paths = [str(f) for f in file_paths]
 
         reader = ParquetReader(
             file_paths=str(file_paths),
