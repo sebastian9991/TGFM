@@ -54,8 +54,10 @@ def test_curator_text_parquet_processing():
 
         ray_client.stop()
     except ConnectionError as e:
+        import traceback
         ray_client.stop()
-        print(f'Pytest Passing but with exception: {e}')
+        print(f'Pytest Passing but with exception: {e}\n{traceback.format_exc}')
     except Exception as e:
+        import traceback
         ray_client.stop()
-        pytest.fail(f"Pipeline failed with exception: {e}")
+        pytest.fail(f"Pipeline failed with exception: {e}\n{traceback.format_exc}")
