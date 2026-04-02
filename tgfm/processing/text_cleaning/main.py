@@ -94,7 +94,11 @@ def run_text_cleaning() -> None:
 
         ray_client.stop()
     except Exception as e:
-        logging.info(f'Text cleaning failed with exception: {e}')
+        import traceback
+
+        logging.info(
+            f'Text cleaning failed with exception: {e}\n{traceback.format_exc()}'
+        )
         ray_client.stop()
 
 
