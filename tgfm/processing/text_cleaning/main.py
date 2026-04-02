@@ -67,7 +67,7 @@ def run_text_cleaning() -> None:
         reader = ParquetReader(
             file_paths=str(file_paths),
             files_per_partition=args.files_per_partition,
-            fields=['domain', 'wet_record_txt'],
+            fields=['Domain_Name', 'wet_record_txt'],
         )
         pipeline.add_stage(reader)
 
