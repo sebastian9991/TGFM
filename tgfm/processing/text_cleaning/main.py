@@ -1,5 +1,6 @@
 import argparse
 import logging
+import time
 
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
@@ -55,6 +56,7 @@ def run_text_cleaning() -> None:
     scratch = get_scratch()
     ray_client = RayClient(num_cpus=args.num_cpus, num_gpus=args.num_gpus)
     ray_client.start()
+    time.sleep(10)
     file_paths = scratch / args.file_paths
 
     output_path = scratch / args.output_path
