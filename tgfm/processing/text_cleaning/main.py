@@ -5,7 +5,6 @@ import time
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
 from nemo_curator.stages.text.filters import WordCountFilter
-from nemo_curator.stages.text.filters.score_filter import ScoreFilter
 from nemo_curator.stages.text.io.reader import ParquetReader
 from nemo_curator.stages.text.io.writer import ParquetWriter
 from nemo_curator.stages.text.modifiers import (
@@ -14,6 +13,7 @@ from nemo_curator.stages.text.modifiers import (
     UrlRemover,
 )
 from nemo_curator.stages.text.modules import Modify
+from nemo_curator.stages.text.modules.score_filter import ScoreFilter
 
 from tgfm.utils.path import get_scratch
 
