@@ -70,7 +70,7 @@ def run_text_cleaning() -> None:
             file_paths=str(file_paths),
             files_per_partition=args.files_per_partition,
             fields=['Domain_Name', 'wet_record_txt'],
-            block_size='512MB',
+            blocksize='512MB',
         )
         pipeline.add_stage(reader)
 
