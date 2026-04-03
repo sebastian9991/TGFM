@@ -6,7 +6,7 @@ from nemo_curator.utils.split_large_files import split_parquet_file_by_size
 from tgfm.utils.path import get_scratch
 
 parser = argparse.ArgumentParser(
-    description='Text cleaning pipeline.',
+    description='Parquet Sharding.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(
@@ -38,7 +38,7 @@ def run_file_splitting() -> None:
     output_path.mkdir(parents=True, exist_ok=True)
     try:
         for path in file_paths.glob('dec2024_wetcontent_*.parquet'):
-            split_parquet_file_by_size(
+            split_parquet_file_by_size.remote(
                 input_file=str(path),
                 output_path=str(output_path),
                 target_size_mb=args.target_size_mb,
