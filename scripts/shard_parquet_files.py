@@ -58,7 +58,7 @@ def main() -> None:
 
     parquet_files = [p for p in source_dir.glob('*.parquet') if p.is_file()]
 
-    for p_file in parquet_files:
+    for p_file in tqdm(parquet_files, desc='parquet files'):
         shard_parquet_file(p_file, output_dir, MAX_BYTES)
 
     logging.info('Partitioning complete.')
