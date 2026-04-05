@@ -14,7 +14,6 @@ from tgfm.utils.path import get_root_dir
 
 def test_curator_deduplication_minhash():
     """Verify deduplication on sample dataset."""
-
     ray_client = RayClient(num_cpus=8, num_gpus=1, object_store_memory=500_000_000)
     ray_client.start()
     time.sleep(10)
