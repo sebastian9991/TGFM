@@ -1,6 +1,7 @@
 #Ours:
 
 scripts/throwaway/
+data/test_data/nemo_curator/data/curated/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
