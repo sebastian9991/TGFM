@@ -44,7 +44,6 @@ def test_curator_text_parquet_processing_full_pipeline_credibench_parquet_format
             file_paths=path,
             files_per_partition=1,
             fields=["Domain_Name", "wet_record_txt"],  # Only read specific columns
-            blocksize="1MB",
         )
         pipeline.add_stage(reader)
 

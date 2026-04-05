@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
@@ -18,6 +20,7 @@ def test_curator_text_parquet_processing_full_pipeline():
 
     ray_client = RayClient(num_cpus=8, num_gpus=1, object_store_memory=500_000_000)
     ray_client.start()
+    time.sleep(10)
 
     try:
         root = get_root_dir()
@@ -30,7 +33,6 @@ def test_curator_text_parquet_processing_full_pipeline():
             / "nemo_curator"
             / "data"
             / "sample"
-            / "sample_data.parquet"
         )
 
         path_curated = str(
