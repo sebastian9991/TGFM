@@ -25,6 +25,11 @@ parser.add_argument(
     help='Path to parquet files to process.',
 )
 parser.add_argument(
+    '--overwrite',
+    action='store_true',
+    help='Whether to overwrite the current shards.',
+)
+parser.add_argument(
     '--log-file-path',
     type=str,
     default='reduce_partition_size.log',
@@ -53,8 +58,12 @@ def main() -> None:
     setup_logging(args.log_file_path)
     scratch = get_scratch()
     source_dir = scratch / args.shard_paths
-    output_dir = source_dir / 'curator_shards'
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if args.overwrite:
+        output_dir = source_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = source_dir / 'curator_shards'
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     parquet_files = [p for p in source_dir.glob('*.parquet') if p.is_file()]
 
