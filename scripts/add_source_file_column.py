@@ -50,6 +50,7 @@ def main() -> None:
     args = parser.parse_args()
     setup_logging(args.log_file_path)
     source_dir = Path(args.shard_paths)
+    logging.info(f'Reading path: {source_dir}')
     if args.overwrite:
         output_dir = source_dir
         output_dir.mkdir(parents=True, exist_ok=True)
