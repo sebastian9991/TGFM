@@ -6,7 +6,6 @@ import pandas as pd
 from tqdm import tqdm
 
 from tgfm.utils.logger import setup_logging
-from tgfm.utils.path import get_scratch
 
 parser = argparse.ArgumentParser(
     description='Add source column.',
@@ -50,8 +49,7 @@ def add_source_column(input_file: Path, output_dir: Path) -> None:
 def main() -> None:
     args = parser.parse_args()
     setup_logging(args.log_file_path)
-    scratch = get_scratch()
-    source_dir = scratch / args.shard_paths
+    source_dir = Path(args.shard_paths)
     if args.overwrite:
         output_dir = source_dir
         output_dir.mkdir(parents=True, exist_ok=True)
