@@ -113,6 +113,7 @@ def main() -> None:
     setup_logging(args.log_file_path)
     scratch = get_scratch()
     file_paths = scratch / args.file_paths
+    file_paths.mkdir(parents=True, exist_ok=True)
 
     output_path = scratch / args.output_path
     output_path.mkdir(parents=True, exist_ok=True)
