@@ -19,12 +19,6 @@ parser.add_argument(
     help='Path to parquet files to process.',
 )
 parser.add_argument(
-    '--output-path',
-    type=str,
-    default='data/test_data/data/',
-    help='Path to parquet files to process.',
-)
-parser.add_argument(
     '--overwrite',
     action='store_true',
     help='Whether to overwrite the current shards.',
