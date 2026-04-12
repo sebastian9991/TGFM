@@ -15,7 +15,6 @@ from nemo_curator.stages.text.deduplication.removal_workflow import (
 )
 
 from tgfm.utils.logger import setup_logging
-from tgfm.utils.path import get_scratch
 
 parser = argparse.ArgumentParser(
     description='Text Deduplication pipeline.',
@@ -35,8 +34,8 @@ parser.add_argument(
 )
 parser.add_argument(
     '--deduplication-method',
-    default=['fuzzy', 'exact'],
-    required=True,
+    choices=['fuzzy', 'exact'],
+    default='fuzzy',
     help='Method to use for deduplication.',
 )
 parser.add_argument(
@@ -133,10 +132,9 @@ def run_deduplication(
 def main() -> None:
     args = parser.parse_args()
     setup_logging(args.log_file_path)
-    scratch = get_scratch()
-    file_paths = scratch / args.file_paths
+    file_paths = Path(args.file_paths)
     file_paths.mkdir(parents=True, exist_ok=True)
-    output_path = scratch / args.output_path
+    output_path = Path(args.output_path)
     output_path.mkdir(parents=True, exist_ok=True)
     cache_path = output_path / 'cache'
     cache_path.mkdir(parents=True, exist_ok=True)

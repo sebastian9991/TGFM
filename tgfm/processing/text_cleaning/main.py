@@ -15,7 +15,6 @@ from nemo_curator.stages.text.modifiers import (
 from nemo_curator.stages.text.modules import Modify
 
 from tgfm.utils.logger import setup_logging
-from tgfm.utils.path import get_scratch
 
 parser = argparse.ArgumentParser(
     description='Text cleaning pipeline.',
@@ -111,10 +110,9 @@ def run_text_cleaning(
 def main() -> None:
     args = parser.parse_args()
     setup_logging(args.log_file_path)
-    scratch = get_scratch()
     file_paths = Path(args.file_paths)
 
-    output_path = scratch / args.output_path
+    output_path = Path(args.output_path)
     output_path.mkdir(parents=True, exist_ok=True)
     logging.info('Running Text Cleaning.')
     run_text_cleaning(
