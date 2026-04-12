@@ -71,10 +71,11 @@ def run_deduplication(
     ray_client = RayClient(num_cpus=num_cpus, num_gpus=num_gpus)
     ray_client.start()
     time.sleep(10)
+    ids_to_remove_path.mkdir(parents=True, exist_ok=True)
+    duplicated_method = ''
     try:
         if deduplication_method == 'fuzzy':
-            ids_to_remove_path = ids_to_remove_path / 'FuzzyDeduplicateIds'
-            ids_to_remove_path.mkdir(parents=True, exist_ok=True)
+            duplicated_method = 'FuzzyDuplicateIds'
             fuzzy_workflow = FuzzyDeduplicationWorkflow(
                 input_path=str(file_paths),
                 cache_path=str(cache_path),
@@ -88,8 +89,7 @@ def run_deduplication(
             )
             fuzzy_workflow.run()
         elif deduplication_method == 'exact':
-            ids_to_remove_path = ids_to_remove_path / 'ExactDuplicateIds'
-            ids_to_remove_path.mkdir(parents=True, exist_ok=True)
+            duplicated_method = 'ExactDuplicateIds'
             exact_workflow = ExactDeduplicationWorkflow(
                 input_path=str(file_paths),
                 output_path=str(ids_to_remove_path),
@@ -100,14 +100,16 @@ def run_deduplication(
             )
             exact_workflow.run()
 
-        if any(ids_to_remove_path.glob('*.parquet')):
+        duplicated_path = ids_to_remove_path / duplicated_method
+        if any(duplicated_path.glob('*.parquet')):
             removal_workflow = TextDuplicatesRemovalWorkflow(
                 input_path=str(file_paths),
-                ids_to_remove_path=str(ids_to_remove_path),
+                ids_to_remove_path=str(duplicated_path),
                 output_path=str(output_path),
                 input_filetype='parquet',
                 input_id_field='_curator_dedup_id',
                 ids_to_remove_duplicate_id_field='_curator_dedup_id',
+                id_generator_path=str(ids_to_remove_path / 'fuzzy_id_generator.json'),
             )
             removal_workflow.run()
         else:
