@@ -69,7 +69,7 @@ def run_deduplication(
 ) -> None:
     ray_client = RayClient(num_cpus=num_cpus, num_gpus=num_gpus)
     ray_client.start()
-    time.sleep(10)
+    time.sleep(30)
     ids_to_remove_path.mkdir(parents=True, exist_ok=True)
     duplicated_method = ''
     try:
