@@ -75,8 +75,7 @@ def read_parquet():
         / "nemo_curator"
         / "data"
         / "curated"
-        / "deduplicated"
-        / "4f71d8c54c86.parquet",
+        / "deduplicated",
         engine="pyarrow",
     )
     return {"original": df, "curated": df_cur}
