@@ -30,11 +30,12 @@ def test_curator_deduplication_minhash():
             / "sample"
             / "sample_data_duplicate.parquet"
         )
-        path_curated = root / "data" / "test_data" / "nemo_curator" / "data" / "curated"
+        path_curated = root / "data" / "test_data" / "nemo_curator" / "data" / "curated" / 'deduplicated'
         path_cache = (
             root / "data" / "test_data" / "nemo_curator" / "data" / "curated" / "cache"
         )
         path_cache.mkdir(parents=True, exist_ok=True)
+        path_curated.mkdir(parents=True, exist_ok=True)
         ids_to_remove_path = (
             root
             / "data"
@@ -43,7 +44,6 @@ def test_curator_deduplication_minhash():
             / "data"
             / "curated"
             / "ids_to_remove"
-            / "FuzzyDeduplicateIds"
         )
         ids_to_remove_path.mkdir(parents=True, exist_ok=True)
 
@@ -62,14 +62,16 @@ def test_curator_deduplication_minhash():
         fuzzy_workflow.run()
 
         path_cache.mkdir(parents=True, exist_ok=True)
-        if any(ids_to_remove_path.glob("*.parquet")):
+        duplicated_ids = ids_to_remove_path / "FuzzyDuplicateIds"
+        if any(duplicated_ids.glob("*.parquet")):
             removal_workflow = TextDuplicatesRemovalWorkflow(
                 input_path=str(path),
-                ids_to_remove_path=str(ids_to_remove_path),
+                ids_to_remove_path=str(duplicated_ids),
                 output_path=str(path_curated),
                 input_filetype="parquet",
                 input_id_field="_curator_dedup_id",
                 ids_to_remove_duplicate_id_field="_curator_dedup_id",
+                id_generator_path=str(ids_to_remove_path / 'fuzzy_id_generator.json')
             )
 
             removal_workflow.run()
