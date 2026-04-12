@@ -33,7 +33,7 @@ parser.add_argument(
 def add_source_column(input_file: Path, output_dir: Path) -> None:
     df = pd.read_parquet(input_file)
 
-    if '__source_file_' in df.columns:
+    if '__source_file' in df.columns:
         logging.warning(
             f'Skipping {input_file.name}: __source_file_column already included.'
         )
@@ -52,15 +52,18 @@ def main() -> None:
     source_dir = Path(args.shard_paths)
     logging.info(f'Reading path: {source_dir}')
     if args.overwrite:
-        output_dir = source_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = source_dir if source_dir.is_dir() else source_dir.parent
     else:
+        source_dir if source_dir.is_dir() else source_dir.parent
         output_dir = source_dir / 'curator_shards'
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    parquet_files = [p for p in source_dir.glob('*.parquet') if p.is_file()]
-
-    logging.info(f'Found {len(parquet_files)} shard(s) in {source_dir}')
+    if source_dir.is_dir():
+        parquet_files = [p for p in source_dir.glob('*.parquet') if p.is_file()]
+        logging.info(f'Found {len(parquet_files)} shard(s) in {source_dir}')
+    else:
+        parquet_files = [source_dir]
+        logging.info(f'One parquet file: {source_dir}')
 
     for p_file in tqdm(parquet_files, desc='parquet files'):
         add_source_column(p_file, output_dir)
