@@ -132,9 +132,9 @@ def run_deduplication(
 def main() -> None:
     args = parser.parse_args()
     setup_logging(args.log_file_path)
-    file_paths = Path(args.file_paths)
+    file_paths = Path(args.file_paths).resolve()
     file_paths.mkdir(parents=True, exist_ok=True)
-    output_path = Path(args.output_path)
+    output_path = Path(args.output_path).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
     cache_path = output_path / 'cache'
     cache_path.mkdir(parents=True, exist_ok=True)
