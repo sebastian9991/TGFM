@@ -1,3 +1,4 @@
+import argparse
 import logging
 from pathlib import Path
 
@@ -6,15 +7,44 @@ import pyarrow.parquet as pq
 from tqdm import tqdm
 
 from tgfm.utils.logger import setup_logging
-from tgfm.utils.path import get_scratch
 
 MAX_BYTES = 128 * 1024 * 1024
+
+parser = argparse.ArgumentParser(
+    description='Reduce partition size.',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+)
+parser.add_argument(
+    '--shard-paths',
+    type=str,
+    default='data/test_data/data/sample/',
+    help='Path to parquet files to process.',
+)
+parser.add_argument(
+    '--output-path',
+    type=str,
+    default='data/test_data/data/',
+    help='Path to parquet files to process.',
+)
+parser.add_argument(
+    '--max-MB',
+    type=int,
+    default=128,
+    help='Max MB per shard. Assumed unit is MB. Recommended = 128MB.',
+)
+parser.add_argument(
+    '--log-file-path',
+    type=str,
+    default='reduce_partition_size.log',
+    help='Path to log file.',
+)
 
 
 def shard_parquet_file(
     input_file: Path, output_dir: Path, max_shard_bytes: int
 ) -> None:
     logging.info(f'Processing {input_file.name}...')
+    max_shard_bytes = max_shard_bytes * 1024 * 1024  # convert to MB
     parquet_file = pq.ParquetFile(input_file)
     base_name = input_file.stem
 
@@ -50,16 +80,16 @@ def shard_parquet_file(
 
 
 def main() -> None:
-    setup_logging('shard_parquet_files.log')
-    scratch = get_scratch()
-    source_dir = scratch / 'credibench_text' / 'dec'
+    args = parser.parse_args()
+    setup_logging(args.log_file_path)
+    source_dir = Path(args.shard_paths)
     output_dir = source_dir / 'curator_shards'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     parquet_files = [p for p in source_dir.glob('*.parquet') if p.is_file()]
 
     for p_file in tqdm(parquet_files, desc='parquet files'):
-        shard_parquet_file(p_file, output_dir, MAX_BYTES)
+        shard_parquet_file(p_file, output_dir, args.max_MB)
 
     logging.info('Partitioning complete.')
 

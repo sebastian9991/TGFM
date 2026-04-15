@@ -1,10 +1,10 @@
 import argparse
 import logging
 import time
+from pathlib import Path
 
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
-from nemo_curator.stages.text.filters import WordCountFilter
 from nemo_curator.stages.text.io.reader import ParquetReader
 from nemo_curator.stages.text.io.writer import ParquetWriter
 from nemo_curator.stages.text.modifiers import (
@@ -13,9 +13,8 @@ from nemo_curator.stages.text.modifiers import (
     UrlRemover,
 )
 from nemo_curator.stages.text.modules import Modify
-from nemo_curator.stages.text.modules.score_filter import ScoreFilter
 
-from tgfm.utils.path import get_scratch
+from tgfm.utils.logger import setup_logging
 
 parser = argparse.ArgumentParser(
     description='Text cleaning pipeline.',
@@ -51,25 +50,30 @@ parser.add_argument(
     default=4,
     help='Number of gpus to pass to Ray Client.',
 )
+parser.add_argument(
+    '--log-file-path',
+    type=str,
+    default='text_cleaning.log',
+    help='Path to log file.',
+)
 
 
-def run_text_cleaning() -> None:
-    args = parser.parse_args()
-    scratch = get_scratch()
-    ray_client = RayClient(num_cpus=args.num_cpus, num_gpus=args.num_gpus)
+def run_text_cleaning(
+    file_paths: Path,
+    output_path: Path,
+    files_per_partition: int,
+    num_cpus: int,
+    num_gpus: int,
+) -> None:
+    ray_client = RayClient(num_cpus=num_cpus, num_gpus=num_gpus)
     ray_client.start()
     time.sleep(10)
-    file_paths = scratch / args.file_paths
-
-    output_path = scratch / args.output_path
-    output_path.mkdir(parents=True, exist_ok=True)
     try:
         pipeline = Pipeline(name='Text cleaning pipeline.')
 
         reader = ParquetReader(
             file_paths=str(file_paths),
-            files_per_partition=args.files_per_partition,
-            fields=['Domain_Name', 'wet_record_txt'],
+            files_per_partition=files_per_partition,
         )
         pipeline.add_stage(reader)
 
@@ -83,16 +87,14 @@ def run_text_cleaning() -> None:
             Modify(modifier_fn=UrlRemover(), input_fields='wet_record_txt')
         )
 
-        # # TODO: Do we need this? Likely we do not
-        word_filter = ScoreFilter(
-            filter_obj=WordCountFilter(min_words=50, max_words=1000),
-            text_field='wet_record_txt',
-        )
-
-        pipeline.add_stage(word_filter)
-
         pipeline.add_stage(ParquetWriter(str(output_path)))
-        pipeline.run()
+        results = pipeline.run()
+
+        for task in results:
+            for perf in task._stage_perf:
+                logging.info(f'Stage: {perf.stage_name}')
+                logging.info(f'     Duration: {perf.process_time}s')
+                logging.info(f'     Items Processed: {perf.num_items_processed}')
 
         ray_client.stop()
     except Exception as e:
@@ -104,5 +106,22 @@ def run_text_cleaning() -> None:
         ray_client.stop()
 
 
+def main() -> None:
+    args = parser.parse_args()
+    setup_logging(args.log_file_path)
+    file_paths = Path(args.file_paths)
+
+    output_path = Path(args.output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
+    logging.info('Running Text Cleaning.')
+    run_text_cleaning(
+        file_paths=file_paths,
+        output_path=output_path,
+        files_per_partition=args.files_per_partition,
+        num_cpus=args.num_cpus,
+        num_gpus=args.num_gpus,
+    )
+
+
 if __name__ == '__main__':
-    run_text_cleaning()
+    main()
