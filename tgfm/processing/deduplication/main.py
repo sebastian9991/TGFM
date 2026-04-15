@@ -70,6 +70,7 @@ def run_deduplication(
     ray_client = RayClient(num_cpus=num_cpus, num_gpus=num_gpus)
     ray_client.start()
     time.sleep(30)
+    input_blocksize = '128MiB'
     ids_to_remove_path.mkdir(parents=True, exist_ok=True)
     duplicated_method = ''
     try:
@@ -79,6 +80,7 @@ def run_deduplication(
                 input_path=str(file_paths),
                 cache_path=str(cache_path),
                 output_path=str(ids_to_remove_path),
+                input_blocksize=input_blocksize,
                 text_field='wet_record_txt',
                 perform_removal=False,
                 input_filetype='parquet',
@@ -106,6 +108,7 @@ def run_deduplication(
                 ids_to_remove_path=str(duplicated_path),
                 output_path=str(output_path),
                 input_filetype='parquet',
+                input_blocksize=input_blocksize,
                 input_id_field='_curator_dedup_id',
                 ids_to_remove_duplicate_id_field='_curator_dedup_id',
                 id_generator_path=str(ids_to_remove_path / 'fuzzy_id_generator.json'),
