@@ -94,7 +94,7 @@ def run_deduplication(
             exact_workflow = ExactDeduplicationWorkflow(
                 input_path=str(file_paths),
                 output_path=str(ids_to_remove_path),
-                text_field='text',
+                text_field='wet_record_txt',
                 assign_id=True,
                 perform_removal=False,
                 input_filetype='parquet',
