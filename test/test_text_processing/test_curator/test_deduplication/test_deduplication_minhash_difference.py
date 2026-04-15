@@ -1,3 +1,4 @@
+import os
 
 import pandas as pd
 import pytest
@@ -6,6 +7,10 @@ from tgfm.processing.deduplication.main import run_deduplication
 from tgfm.utils.path import get_root_dir
 
 
+@pytest.mark.skipif(
+    os.getenv("GITHUB_ACTIONS") == "true",
+    reason="Standard Github Action runners do not support GPU/CUDA tests.",
+)
 @pytest.fixture(scope="session", autouse=True)
 def get_deduplication():
     """Verify deduplication on sample dataset."""
@@ -107,4 +112,4 @@ def test_maintained_source_file_column(read_parquet):
 
     columns = [c for c in df_deduplicated.columns]
 
-    assert '__source_file' in columns
+    assert "__source_file" in columns
