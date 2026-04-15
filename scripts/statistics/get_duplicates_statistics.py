@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 import pandas as pd
+from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
 from nemo_curator.stages.base import ProcessingStage
 from nemo_curator.stages.deduplication.id_generator import CURATOR_DEDUP_ID_STR
@@ -124,7 +125,9 @@ def get_duplicates_statistics(
             kill_id_generator_actor,
         )
 
+        client = RayClient(num_cpus=16, num_gpus=1)  # change as needed
         try:
+            client.start()
             create_id_generator_actor(
                 filepath=str(
                     deduplicate_path / 'ids_to_remove' / 'fuzzy_id_generator.json'
@@ -136,6 +139,7 @@ def get_duplicates_statistics(
             ).sort_values('_duplicate_group_id')
         finally:
             kill_id_generator_actor()
+            client.stop()
 
         logging.info(
             f'Merged_df in largest duplicate cluster\n: {merged_df[merged_df._curator_dedup_id.isin(largest_duplicate_cluster)]}'
