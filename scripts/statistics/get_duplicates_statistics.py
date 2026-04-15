@@ -13,6 +13,7 @@ from nemo_curator.stages.text.io.reader import ParquetReader
 from nemo_curator.tasks.document import DocumentBatch
 
 from tgfm.utils.logger import setup_logging
+from tgfm.utils.path import get_root_dir
 
 parser = argparse.ArgumentParser(
     description='Deduplication statistics.',
@@ -80,11 +81,13 @@ def plot_clusters(cluster_sizes: pd.Series, save_path: Path) -> None:
 
     save_path = save_path / 'plot_clusters.png'
     plt.savefig(save_path)
+    logging.info(f'Cluster plot saved to: {save_path}')
 
 
 def get_duplicates_statistics(
     input_path: Path,
     deduplicate_path: Path,
+    plot_path: Path,
     block_size: str,
     get_examples: bool = False,
     cluster_idx: int = 0,
@@ -106,6 +109,9 @@ def get_duplicates_statistics(
     logging.info(f'Grouped cc dataframe\n:{grouped_cc_df.head()}')
     duplicate_cluster_sizes = cc_df._duplicate_group_id.value_counts()
     logging.info(f'Cluster sizes: {duplicate_cluster_sizes}')
+
+    logging.info(f'Plotting cluster sizes')
+    plot_clusters(duplicate_cluster_sizes, plot_path)
 
     # As an example let's look at the group with the largest number of duplicates
     largest_duplicate_cluster = grouped_cc_df.loc[duplicate_cluster_sizes.index[0]]
@@ -192,14 +198,18 @@ def get_duplicates_statistics(
 
 
 def main() -> None:
+    root = get_root_dir()
     args = parser.parse_args()
     setup_logging(args.log_file_path)
     input_path = Path(args.input_path)
     deduplicate_path = Path(args.deduplication_path)
+    plot_path = root / 'plots'
+    plot_path.mkdir(parents=True, exist_ok=True)
 
     get_duplicates_statistics(
         input_path=input_path,
         deduplicate_path=deduplicate_path,
+        plot_path=plot_path,
         block_size=args.block_size,
         get_examples=args.display_example,
         cluster_idx=args.cluster_idx,
