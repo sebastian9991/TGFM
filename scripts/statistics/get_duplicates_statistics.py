@@ -3,7 +3,9 @@ import logging
 import time
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
 from nemo_curator.core.client import RayClient
 from nemo_curator.pipeline import Pipeline
 from nemo_curator.stages.base import ProcessingStage
@@ -56,30 +58,34 @@ parser.add_argument(
 )
 
 
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
-
-
 def plot_clusters(cluster_sizes: pd.Series, save_path: Path) -> None:
-    """Plots the distribution of duplicate cluster sizes."""
+    """Plots the distribution of duplicate cluster sizes using a log-scale histogram
+    and a sorted cluster size plot.
+    """
     sns.set_theme(style='whitegrid')
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-    sns.histplot(cluster_sizes, bins=50, kde=False, ax=axes[0], color='skyblue')
-    axes[0].set_title('Distribution of Cluster Sizes (Linear)')
+    # Plot 1: Histogram of cluster sizes (Log Scale)
+    sns.histplot(cluster_sizes, bins=50, kde=False, ax=axes[0], color='salmon')
+    axes[0].set_yscale('log')
+    axes[0].set_title('Distribution of Cluster Sizes ($\log$ Scale)')
     axes[0].set_xlabel('Number of Documents in Cluster')
-    axes[0].set_ylabel('Frequency of Clusters')
+    axes[0].set_ylabel('Frequency ($\log$)')
 
-    sns.histplot(cluster_sizes, bins=50, kde=False, ax=axes[1], color='salmon')
-    axes[1].set_yscale('log')
-    axes[1].set_title('Distribution of Cluster Sizes (Log Scale)')
-    axes[1].set_xlabel('Number of Documents in Cluster')
-    axes[1].set_ylabel('Frequency (Log)')
+    # Plot 2: Number of duplicates per cluster
+    # Ensure sizes are sorted from largest to smallest
+    sorted_sizes = cluster_sizes.sort_values(ascending=False).values
+
+    axes[1].plot(range(len(sorted_sizes)), sorted_sizes, color='skyblue')
+    axes[1].set_title('Number of Duplicates per Cluster')
+    axes[1].set_xlabel('Cluster Index')
+    axes[1].set_ylabel('Number of Duplicates')
+
+    axes[1].set_xticks([])
 
     plt.tight_layout()
 
-    save_path = save_path / 'plot_clusters.png'
+    save_path = save_path / 'cluster_statistics.png'
     plt.savefig(save_path)
     logging.info(f'Cluster plot saved to: {save_path}')
 
