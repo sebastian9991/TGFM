@@ -28,8 +28,8 @@ def get_duplicates_statistics(deduplicate_path: Path) -> None:
     """Statistics on duplicates."""
     # NOTE: This may break with large parquet files.
 
-    deduplicate_path = deduplicate_path / 'ids_to_remove' / 'FuzzyDuplicateIds'
-    duplicates_df = pd.read_parquet(deduplicate_path)
+    duplicates_path = deduplicate_path / 'ids_to_remove' / 'FuzzyDuplicateIds'
+    duplicates_df = pd.read_parquet(duplicates_path)
     logging.info(f'Duplicate head:\n{duplicates_df.head()}')
     logging.info(
         f'Number of duplicate documents found for removal: {len(duplicates_df)}'
