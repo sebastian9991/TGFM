@@ -7,7 +7,6 @@ import pyarrow.parquet as pq
 from tqdm import tqdm
 
 from tgfm.utils.logger import setup_logging
-from tgfm.utils.path import get_scratch
 
 MAX_BYTES = 128 * 1024 * 1024
 
@@ -83,8 +82,7 @@ def shard_parquet_file(
 def main() -> None:
     args = parser.parse_args()
     setup_logging(args.log_file_path)
-    scratch = get_scratch()
-    source_dir = scratch / args.shard_paths
+    source_dir = Path(args.shard_paths)
     output_dir = source_dir / 'curator_shards'
     output_dir.mkdir(parents=True, exist_ok=True)
 
