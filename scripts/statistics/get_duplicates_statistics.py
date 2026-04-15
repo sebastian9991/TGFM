@@ -114,7 +114,7 @@ def get_duplicates_statistics(
             name='Explore duplicates',
             stages=[
                 ParquetReader(
-                    file_paths=str(input_path / 'cleaned_text'),
+                    file_paths=str(input_path),
                     blocksize=block_size,
                     _assign_ids=True,
                 ),
