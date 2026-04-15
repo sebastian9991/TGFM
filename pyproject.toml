@@ -17,6 +17,7 @@ dev = [
     "mypy>=1.19.1",
     "nemo-curator[text-cuda12]>=1.1.0",
     "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.flit.module]
