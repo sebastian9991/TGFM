@@ -175,6 +175,7 @@ def main() -> None:
         deduplicate_path=deduplicate_path,
         block_size=args.block_size,
         get_examples=args.display_example,
+        cluster_idx=args.cluster_idx,
     )
 
 
