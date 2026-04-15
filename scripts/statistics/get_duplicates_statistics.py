@@ -31,6 +31,12 @@ parser.add_argument(
     help='Path to deduplicated processed files.',
 )
 parser.add_argument(
+    '--cluster-idx',
+    type=int,
+    default=0,
+    help='Consider the ith cluster.',
+)
+parser.add_argument(
     '--display-example',
     action='store_true',
     help='Whether to display example duplicated text.',
@@ -54,6 +60,7 @@ def get_duplicates_statistics(
     deduplicate_path: Path,
     block_size: str,
     get_examples: bool = False,
+    cluster_idx: int = 0,
 ) -> None:
     """Statistics on duplicates."""
     # NOTE: This may break with large parquet files.
@@ -149,7 +156,7 @@ def get_duplicates_statistics(
 
         duplicates = merged_df[
             merged_df._curator_dedup_id.isin(
-                grouped_cc_df.loc[duplicate_cluster_sizes.index[0]]
+                grouped_cc_df.loc[duplicate_cluster_sizes.index[cluster_idx]]
             )
         ]
         logging.info(f'Duplicates dataframe in largest cluster\n: {duplicates}')
