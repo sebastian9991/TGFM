@@ -59,32 +59,44 @@ parser.add_argument(
 
 
 def plot_clusters(cluster_sizes: pd.Series, save_path: Path) -> None:
-    """Plots the distribution of duplicate cluster sizes using a log-scale histogram
-    and a sorted cluster size plot.
+    """Plots a log-scale histogram of duplicate cluster sizes with arrows
+    pointing to the largest and second largest clusters.
     """
+    # Set visual style
     sns.set_theme(style='whitegrid')
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Plot 1: Histogram of cluster sizes (Log Scale)
-    sns.histplot(cluster_sizes, bins=50, kde=False, ax=axes[0], color='salmon')
-    axes[0].set_yscale('log')
-    axes[0].set_title('Distribution of Cluster Sizes ($\log$ Scale)')
-    axes[0].set_xlabel('Number of Documents in Cluster')
-    axes[0].set_ylabel('Frequency ($\log$)')
+    # Plot: Histogram of cluster sizes (Log Scale)
+    sns.histplot(cluster_sizes, bins=50, kde=False, ax=ax, color='salmon')
+    ax.set_yscale('log')
+    ax.set_title('Distribution of Cluster Sizes (Log Scale)')
+    ax.set_xlabel('Number of Documents in Cluster')
+    ax.set_ylabel('Frequency (Log)')
 
-    # Plot 2: Number of duplicates per cluster
-    # Ensure sizes are sorted from largest to smallest
-    sorted_sizes = cluster_sizes.sort_values(ascending=False).values
+    # Identify largest and second largest for annotation
+    sorted_unique_sizes = sorted(cluster_sizes.unique(), reverse=True)
 
-    axes[1].plot(range(len(sorted_sizes)), sorted_sizes, color='skyblue')
-    axes[1].set_title('Number of Duplicates per Cluster')
-    axes[1].set_xlabel('Cluster Index')
-    axes[1].set_ylabel('Number of Duplicates')
+    if len(sorted_unique_sizes) >= 1:
+        largest = sorted_unique_sizes[0]
+        ax.annotate(
+            f'Largest: {largest}',
+            xy=(largest, 1),
+            xytext=(largest, 5),
+            arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=8),
+            horizontalalignment='center',
+        )
 
-    axes[1].set_xticks([])
+    if len(sorted_unique_sizes) >= 2:
+        second_largest = sorted_unique_sizes[1]
+        ax.annotate(
+            f'2nd Largest: {second_largest}',
+            xy=(second_largest, 1),
+            xytext=(second_largest, 20),
+            arrowprops=dict(facecolor='blue', shrink=0.05, width=1, headwidth=8),
+            horizontalalignment='center',
+        )
 
     plt.tight_layout()
-
     save_path = save_path / 'cluster_statistics.png'
     plt.savefig(save_path)
     logging.info(f'Cluster plot saved to: {save_path}')
