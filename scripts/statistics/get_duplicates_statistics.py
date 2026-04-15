@@ -55,6 +55,33 @@ parser.add_argument(
 )
 
 
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
+
+def plot_clusters(cluster_sizes: pd.Series, save_path: Path) -> None:
+    """Plots the distribution of duplicate cluster sizes."""
+    sns.set_theme(style='whitegrid')
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+    sns.histplot(cluster_sizes, bins=50, kde=False, ax=axes[0], color='skyblue')
+    axes[0].set_title('Distribution of Cluster Sizes (Linear)')
+    axes[0].set_xlabel('Number of Documents in Cluster')
+    axes[0].set_ylabel('Frequency of Clusters')
+
+    sns.histplot(cluster_sizes, bins=50, kde=False, ax=axes[1], color='salmon')
+    axes[1].set_yscale('log')
+    axes[1].set_title('Distribution of Cluster Sizes (Log Scale)')
+    axes[1].set_xlabel('Number of Documents in Cluster')
+    axes[1].set_ylabel('Frequency (Log)')
+
+    plt.tight_layout()
+
+    save_path = save_path / 'plot_clusters.png'
+    plt.savefig(save_path)
+
+
 def get_duplicates_statistics(
     input_path: Path,
     deduplicate_path: Path,
