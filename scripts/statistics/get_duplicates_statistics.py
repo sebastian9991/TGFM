@@ -82,7 +82,7 @@ def get_duplicates_statistics(
     ).sum()
 
     logging.info(
-        f'Number of documents in the duplicate group: {len(largest_duplicate_cluster)}'
+        f'Number of documents in the largest duplicate group: {len(largest_duplicate_cluster)}'
     )
     logging.info(
         f'Number of documents in the removal list from the same group: {docs_to_remove_in_group}'
@@ -153,8 +153,8 @@ def get_duplicates_statistics(
             )
         ]
         logging.info(f'Duplicates dataframe in largest cluster\n: {duplicates}')
-        logging.info(f'\nDocument1\n----------\n{duplicates.iloc[0].text}')
-        logging.info(f'\nDocument2\n----------\n{duplicates.iloc[1].text}')
+        logging.info(f'\nDocument1\n----------\n{duplicates.iloc[0].wet_record_txt}')
+        logging.info(f'\nDocument2\n----------\n{duplicates.iloc[1].wet_record_txt}')
 
 
 def main() -> None:
