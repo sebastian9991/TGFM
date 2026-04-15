@@ -10,7 +10,7 @@ from tgfm.utils.path import get_root_dir
 @pytest.fixture(scope="session", autouse=True)
 def get_deduplication():
     """Verify deduplication on sample dataset."""
-    if os.getenv('GITHUB_ACTIONS') == "true":
+    if os.getenv("GITHUB_ACTIONS") == "true":
         pytest.skip("Standard Github Action runners do not support GPU/CUDA tests.")
 
     root = get_root_dir()
