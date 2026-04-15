@@ -11,6 +11,7 @@ from nemo_curator.stages.text.io.writer import ParquetWriter
 from nemo_curator.stages.text.modules import ScoreFilter
 
 from tgfm.utils.logger import setup_logging
+from tgfm.utils.path import get_root_dir
 
 parser = argparse.ArgumentParser(
     description='Language Extraction pipeline.',
@@ -27,12 +28,6 @@ parser.add_argument(
     type=str,
     required=True,
     help='Path to parquet files to process.',
-)
-parser.add_argument(
-    '--fast-text-path',
-    type=str,
-    required=True,
-    help='Path to fast-text model.',
 )
 parser.add_argument(
     '--files-per-partition',
@@ -120,12 +115,13 @@ def run_language_extraction(
 
 
 def main() -> None:
+    root = get_root_dir()
     args = parser.parse_args()
     setup_logging(args.log_file_path)
     file_paths = Path(args.file_paths).resolve()
     output_path = Path(args.output_path).resolve()
     output_path.mkdir(parents=True, exist_ok=True)
-    fast_text_path = Path(args.fast_text_path).resolve()
+    fast_text_path = root / 'fast_text'
     run_language_extraction(
         file_paths=file_paths,
         output_path=output_path,
