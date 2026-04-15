@@ -1,5 +1,6 @@
 import argparse
 import logging
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -128,6 +129,7 @@ def get_duplicates_statistics(
         client = RayClient(num_cpus=16, num_gpus=1)  # change as needed
         try:
             client.start()
+            time.sleep(30)
             create_id_generator_actor(
                 filepath=str(
                     deduplicate_path / 'ids_to_remove' / 'fuzzy_id_generator.json'
