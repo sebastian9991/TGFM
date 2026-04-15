@@ -41,7 +41,7 @@ jobs:
         run: uv sync --all-extras --dev --frozen
 
       - name: Test
-        run: uv run pytest test/ --cov=tgfm/ --cov-report=xml --cov-append -vvv
+        run: uv run pytest test/ --cov=tgfm --cov-report=xml --cov-append -vvv
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
