@@ -1,3 +1,4 @@
+import os
 import time
 
 import pytest
@@ -14,6 +15,8 @@ from tgfm.utils.path import get_root_dir
 
 def test_curator_deduplication_minhash():
     """Verify deduplication on sample dataset."""
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        pytest.skip("Standard Github Action runners do not support GPU/CUDA tests.")
     ray_client = RayClient(num_cpus=8, num_gpus=1, object_store_memory=500_000_000)
     ray_client.start()
     time.sleep(10)
@@ -30,7 +33,15 @@ def test_curator_deduplication_minhash():
             / "sample"
             / "sample_data_duplicate.parquet"
         )
-        path_curated = root / "data" / "test_data" / "nemo_curator" / "data" / "curated" / 'deduplicated'
+        path_curated = (
+            root
+            / "data"
+            / "test_data"
+            / "nemo_curator"
+            / "data"
+            / "curated"
+            / "deduplicated"
+        )
         path_cache = (
             root / "data" / "test_data" / "nemo_curator" / "data" / "curated" / "cache"
         )
@@ -71,7 +82,7 @@ def test_curator_deduplication_minhash():
                 input_filetype="parquet",
                 input_id_field="_curator_dedup_id",
                 ids_to_remove_duplicate_id_field="_curator_dedup_id",
-                id_generator_path=str(ids_to_remove_path / 'fuzzy_id_generator.json')
+                id_generator_path=str(ids_to_remove_path / "fuzzy_id_generator.json"),
             )
 
             removal_workflow.run()
