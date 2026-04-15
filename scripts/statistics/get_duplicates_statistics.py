@@ -43,6 +43,22 @@ def get_duplicates_statistics(deduplicate_path: Path) -> None:
     duplicate_cluster_sizes = cc_df._duplicate_group_id.value_counts()
     logging.info(f'Cluster sizes: {duplicate_cluster_sizes}')
 
+    # As an example let's look at the group with the largest number of duplicates
+    largest_duplicate_cluster = grouped_cc_df.loc[duplicate_cluster_sizes.index[0]]
+
+    # number of docs in the removal list from this group
+    docs_to_remove_in_group = duplicates_df._curator_dedup_id.isin(
+        largest_duplicate_cluster
+    ).sum()
+
+    logging.info(
+        f'Number of documents in the duplicate group: {len(largest_duplicate_cluster)}'
+    )
+    logging.info(
+        f'Number of documents in the removal list from the same group: {docs_to_remove_in_group}'
+    )
+    assert docs_to_remove_in_group == (len(largest_duplicate_cluster) - 1)  # noqa: S101
+
 
 def main() -> None:
     args = parser.parse_args()
