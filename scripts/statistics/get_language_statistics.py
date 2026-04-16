@@ -6,6 +6,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import tqdm as tqdm
 
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
@@ -86,7 +87,7 @@ def get_language_statistics(language_extracts_path: Path, plot_path: Path) -> No
     thresholds = []
     language_thresholds: Dict[str, List] = {}
 
-    for path in language_extracts_path.glob('*.parquet'):
+    for path in tqdm(language_extracts_path.glob('*.parquet'), desc='Iterating shards'):
         df = pd.read_parquet(path, engine='pyarrow')
         for lang in df['language']:
             score, lang_code = lang[0], lang[1]
