@@ -88,7 +88,7 @@ def get_language_statistics(language_extracts_path: Path, plot_path: Path) -> No
 
     for path in language_extracts_path.glob('*.parquet'):
         df = pd.read_parquet(path, engine='pyarrow')
-        for lang in df['languages']:
+        for lang in df['language']:
             score, lang_code = lang[0], lang[1]
 
             frequency_languages[lang_code] = frequency_languages.get(lang_code, 0) + 1
