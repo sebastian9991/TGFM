@@ -15,12 +15,6 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(
-    '--input-path',
-    type=str,
-    required=True,
-    help='Path to pre-processed files.',
-)
-parser.add_argument(
     '--language-extracts',
     type=str,
     required=True,
@@ -112,7 +106,6 @@ def main() -> None:
     root = get_root_dir()
     args = parser.parse_args()
     setup_logging(args.log_file_path)
-    Path(args.input_path)
     language_extracts_path = Path(args.language_extracts)
     plot_path = root / 'plots'
     plot_path.mkdir(parents=True, exist_ok=True)
