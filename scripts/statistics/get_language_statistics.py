@@ -6,7 +6,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import tqdm as tqdm
+from tqdm import tqdm
 
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
