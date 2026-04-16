@@ -1,4 +1,5 @@
 import argparse
+import ast
 import logging
 from pathlib import Path
 from typing import Dict, List
@@ -114,6 +115,7 @@ def get_language_statistics(language_extracts_path: Path, plot_path: Path) -> No
     for path in tqdm(language_extracts_path.glob('*.parquet'), desc='Iterating shards'):
         df = pd.read_parquet(path, engine='pyarrow')
         for lang in df['language']:
+            lang = ast.literal_eval(lang)
             score, lang_code = lang[0], lang[1]
 
             frequency_languages[lang_code] = frequency_languages.get(lang_code, 0) + 1
