@@ -1,6 +1,7 @@
 import argparse
 import ast
 import logging
+import pickle
 from pathlib import Path
 from typing import Dict, List
 
@@ -128,6 +129,12 @@ def get_language_statistics(language_extracts_path: Path, plot_path: Path) -> No
     logging.info(f'Total domains labelled with language: {len(thresholds)}')
     logging.info(f'Number of languages found: {len(frequency_languages)}')
     logging.info(f'Languages found: {frequency_languages.keys()}')
+
+    with open(str(plot_path / 'frequency_languages.pkl'), 'wb') as f:
+        pickle.dump(frequency_languages, f)
+
+    with open(str(plot_path / 'language_thresholds.pkl'), 'wb') as f:
+        pickle.dump(language_thresholds, f)
 
     plot_language_stats(frequency_languages, thresholds, language_thresholds, plot_path)
     logging.info(f'Completed language statistics plotting. Saved to {plot_path}')
