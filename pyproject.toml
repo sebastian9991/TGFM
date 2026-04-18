@@ -14,10 +14,12 @@ dependencies = [
 [dependency-groups]
 dev = [
     "cmake>=3.27,<4.0",
+    "matplotlib>=3.10.8",
     "mypy>=1.19.1",
     "nemo-curator[text-cuda12]>=1.1.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.1.0",
+    "seaborn>=0.13.2",
 ]
 
 [tool.flit.module]
