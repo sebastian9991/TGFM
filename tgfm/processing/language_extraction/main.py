@@ -49,7 +49,7 @@ parser.add_argument(
 parser.add_argument(
     '--num-gpus',
     type=int,
-    default=4,
+    default=1,
     help='Number of gpus to pass to Ray Client.',
 )
 parser.add_argument(
@@ -107,14 +107,14 @@ def run_language_extraction(
         import traceback
 
         logging.info(
-            f'Deduplication failed with exception: {e}\n{traceback.format_exc()}'
+            f'Language extraction failed with exception: {e}\n{traceback.format_exc()}'
         )
         ray_client.stop()
     except Exception as e:
         import traceback
 
         logging.info(
-            f'Deduplication failed with exception: {e}\n{traceback.format_exc()}'
+            f'Language extraction failed with exception: {e}\n{traceback.format_exc()}'
         )
         ray_client.stop()
 
