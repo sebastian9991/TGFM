@@ -2336,6 +2336,15 @@ wheels = [
 ]
 
 [[package]]
+name = "littleutils"
+version = "0.2.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/f0/ddc72338ed9365ced4b109d8b6233b6689d28f41f1e2a4d97fd8c1eb3da9/littleutils-0.2.4.tar.gz", hash = "sha256:c7835b01020ced42e291118b7d78fb16bc2d9a1b4f3f42f3cb3787bb4da53d19", size = 9526, upload-time = "2024-07-07T22:04:35.844Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/ac/a89d28d7421fffc028d68cdfde5e3e056e690cb4b1bbef4a5fea661e16f5/littleutils-0.2.4-py3-none-any.whl", hash = "sha256:d10d5fe2e107c49fe2fc2904a08d6e5a302b41f8405921835ffcc323782d5dbc", size = 8145, upload-time = "2024-07-07T22:04:34.24Z" },
+]
+
+[[package]]
 name = "llvmlite"
 version = "0.44.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3666,6 +3675,25 @@ wheels = [
 ]
 
 [[package]]
+name = "ogb"
+version = "1.3.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "outdated" },
+    { name = "pandas" },
+    { name = "scikit-learn" },
+    { name = "six" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3f/0a/70cc51c00254be784b2b05ee50ec03ca3cf20f130c97cb3d29dd4e9dffce/ogb-1.3.6.tar.gz", hash = "sha256:ce90418a0e3206483187aa7b7ecac1a2c5d85b3b99aceedb807138ee43115914", size = 48908, upload-time = "2023-04-07T05:59:02.964Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/95/e0770cf1ad9667492f56b732f44398ef2756d61df914e10d121a3cad013a/ogb-1.3.6-py3-none-any.whl", hash = "sha256:29ab84078c66a7846bf137c9be9545978616a053e734c032a2ff731d026bb5e9", size = 78750, upload-time = "2023-04-07T05:59:00.053Z" },
+]
+
+[[package]]
 name = "omegaconf"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3784,6 +3812,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6d/c0/4ae7973f3c2cfd2b6e321f1675626f0dab0a97027cc7a297474c9c8f3d04/opentelemetry_semantic_conventions-0.61b0.tar.gz", hash = "sha256:072f65473c5d7c6dc0355b27d6c9d1a679d63b6d4b4b16a9773062cb7e31192a", size = 145755, upload-time = "2026-03-04T14:17:32.664Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b2/37/cc6a55e448deaa9b27377d087da8615a3416d8ad523d5960b78dbeadd02a/opentelemetry_semantic_conventions-0.61b0-py3-none-any.whl", hash = "sha256:fa530a96be229795f8cef353739b618148b0fe2b4b3f005e60e262926c4d38e2", size = 231621, upload-time = "2026-03-04T14:17:19.33Z" },
+]
+
+[[package]]
+name = "outdated"
+version = "0.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "littleutils" },
+    { name = "requests" },
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e9/43/ac45b6c53fc62c99f02dbc310939d8693aa76cdf9900afe74a60febc8266/outdated-0.2.2.tar.gz", hash = "sha256:4b7fdec88e36711120d096d485fc4d5035e4e5ffbd907cf3a6ce2af43058b970", size = 9325, upload-time = "2022-10-29T10:14:01.847Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/04/7d2b9a0d1b81e30f39e6f358bac01f4f18b585f35b0ffc5c83fc274f146b/outdated-0.2.2-py2.py3-none-any.whl", hash = "sha256:3e9c2ee6d17e86ae8cc7bb71d70c4172690121cda367155a30994742172678c8", size = 7543, upload-time = "2022-10-29T10:13:59.919Z" },
 ]
 
 [[package]]
@@ -5417,6 +5459,7 @@ dev = [
     { name = "matplotlib" },
     { name = "mypy" },
     { name = "nemo-curator", extra = ["text-cuda12"] },
+    { name = "ogb" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "seaborn" },
@@ -5436,6 +5479,7 @@ dev = [
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "mypy", specifier = ">=1.19.1" },
     { name = "nemo-curator", extras = ["text-cuda12"], specifier = ">=1.1.0" },
+    { name = "ogb", specifier = ">=1.3.6" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
