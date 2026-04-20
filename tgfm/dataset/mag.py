@@ -1,12 +1,13 @@
 import logging
 import os
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
 import torch
-from ogb.lsc import MAG240MDataset
 from torch_geometric.data import Data, InMemoryDataset
 from tqdm import tqdm
+
+from tgfm.dataset.ogb_mag import MAG240MDataset
 
 
 class MAG240MGraphDataset(InMemoryDataset):
