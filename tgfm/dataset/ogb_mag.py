@@ -1,7 +1,7 @@
 import os
 import os.path as osp
 import shutil
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -124,7 +124,7 @@ class MAG240MDataset(object):
 
 
 class MAG240MEvaluator:
-    def eval(self, input_dict) -> Dict:
+    def eval(self, input_dict: Dict) -> Dict:
         assert 'y_pred' in input_dict and 'y_true' in input_dict
 
         y_pred, y_true = input_dict['y_pred'], input_dict['y_true']

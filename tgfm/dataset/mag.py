@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import pandas as pd
 import torch
@@ -39,7 +39,7 @@ class MAG240MGraphDataset(InMemoryDataset):
     ):
         self.text_csv_path = text_csv_path
         self.idx_to_paperid_path = idx_to_paperid_path
-        self._mag_dataset = None
+        self._mag_dataset: Optional[MAG240MDataset] = None
 
         super().__init__(root, transform, pre_transform, pre_filter)
 
@@ -132,7 +132,7 @@ class MAG240MGraphDataset(InMemoryDataset):
         # Fill in texts from CSV
         for _, row in tqdm(text_df.iterrows(), desc='Processing text'):
             idx = int(row['idx'])
-            paperid = idx_to_paperid[idx]
+            paperid = int(idx_to_paperid.loc[idx, 'paper_id'])
             title = row['title']
             abstract = row['abstract']
 
