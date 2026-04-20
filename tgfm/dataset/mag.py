@@ -49,6 +49,7 @@ class MAG240MGraphDataset(InMemoryDataset):
     def mag_dataset(self) -> MAG240MDataset:
         """Lazy load the MAG240M dataset."""
         if self._mag_dataset is None:
+            logging.info(f'Looking at {self.root} for unprocessed MAG Dataset.')
             self._mag_dataset = MAG240MDataset(root=self.root)
         return self._mag_dataset
 
