@@ -10,6 +10,21 @@ from tqdm import tqdm
 from tgfm.dataset.ogb_mag import MAG240MDataset
 
 
+def log_edge_index_range(edge_index: torch.Tensor) -> None:
+    if edge_index.numel() == 0:
+        logging.warning('Edge index is empty, cannot compute range.')
+
+    min_indices, _ = edge_index.min(dim=1)
+    max_indices, _ = edge_index.max(dim=1)
+
+    logging.info(
+        f'Source indices range: [{min_indices[0].item()}, {max_indices[0].item()}]'
+    )
+    logging.info(
+        f'Target indices range: [{min_indices[1].item()}, {max_indices[1].item()}]'
+    )
+
+
 class MAG240MGraphDataset(InMemoryDataset):
     """InMemory PyTorch Geometric Dataset for OGB MAG240M.
 
@@ -107,6 +122,8 @@ class MAG240MGraphDataset(InMemoryDataset):
         logging.info('Loading edge index...')
         edge_index = self.mag_dataset.edge_index('paper', 'cites', 'paper')
         edge_index_tensor = torch.from_numpy(edge_index)
+        logging.info(f'Shape of edge_index: {edge_index_tensor.shape}')
+        log_edge_index_range(edge_index_tensor)
 
         # Load text CSV
         csv_path, idx_to_paperid_path = self._get_text_csv_path()
