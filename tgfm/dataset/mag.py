@@ -4,6 +4,7 @@ from typing import Callable, List, Optional, Tuple
 
 import pandas as pd
 import torch
+from ogb.lsc import MAG240MDataset
 from torch_geometric.data import Data, InMemoryDataset
 from tqdm import tqdm
 
@@ -37,11 +38,19 @@ class MAG240MGraphDataset(InMemoryDataset):
     ):
         self.text_csv_path = text_csv_path
         self.idx_to_paperid_path = idx_to_paperid_path
+        self._mag_dataset = None
 
         super().__init__(root, transform, pre_transform, pre_filter)
 
         # Load the processed data into memory
         self.data, self.slices = torch.load(self.processed_paths[0])
+
+    @property
+    def mag_dataset(self) -> MAG240MDataset:
+        """Lazy load the MAG240M dataset."""
+        if self._mag_dataset is None:
+            self._mag_dataset = MAG240MDataset(root=self.root)
+        return self._mag_dataset
 
     def _get_text_csv_path(self) -> Tuple[str, str]:
         """Get the path to text.csv, downloading if necessary."""
@@ -78,6 +87,9 @@ class MAG240MGraphDataset(InMemoryDataset):
         """Download the MAG240M dataset.
         The MAG240MDataset class handles downloading automatically.
         """
+        # The MAG240MDataset will download when first accessed
+        _ = self.mag_dataset
+        logging.info('MAG240M dataset downloaded/verified.')
 
     def process(self) -> None:
         """Process the raw data and save a single Data object to processed_dir.
