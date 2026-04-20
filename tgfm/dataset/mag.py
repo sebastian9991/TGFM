@@ -134,7 +134,7 @@ class MAG240MGraphDataset(InMemoryDataset):
             na_values=[''],
         )
         logging.info(f'Loading idx_to_paperid from {idx_to_paperid_path}...')
-        idx_to_paperid = pd.read_csv(idx_to_paperid_path)
+        pd.read_csv(idx_to_paperid_path)
         text_df['title'] = text_df['title'].fillna('')
         text_df['abstract'] = text_df['abstract'].fillna('')
 
@@ -149,7 +149,6 @@ class MAG240MGraphDataset(InMemoryDataset):
         # Fill in texts from CSV
         for _, row in tqdm(text_df.iterrows(), desc='Processing text'):
             idx = int(row['idx'])
-            paperid = int(idx_to_paperid.loc[idx, 'paper_id'])
             title = row['title']
             abstract = row['abstract']
 
@@ -166,7 +165,7 @@ class MAG240MGraphDataset(InMemoryDataset):
             # Add [CLS] and [SEP] tokens
             text = f'[CLS] {text} [SEP]'
 
-            texts[paperid] = text
+            texts[idx] = text
 
         logging.info(f'Processed {len([t for t in texts if t])} non-empty texts')
 
