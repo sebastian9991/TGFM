@@ -119,11 +119,8 @@ class MAG240MGraphDataset(InMemoryDataset):
 
         data_list = [data] if data is not None else []
 
-        # Use collate to create slices
-        data, slices = self.collate(data_list)
-
         logging.info(f'Saving processed data to {self.processed_paths[0]}...')
-        self.save((data, slices), self.processed_paths[0])
+        self.save(data_list, self.processed_paths[0])
         logging.info('Processing complete.')
 
     def get_node_text(self, node_id: int) -> str:
