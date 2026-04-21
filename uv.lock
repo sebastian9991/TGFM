@@ -5452,6 +5452,7 @@ dependencies = [
     { name = "torch" },
     { name = "torch-geometric" },
     { name = "tqdm" },
+    { name = "transformers" },
 ]
 
 [package.dev-dependencies]
@@ -5473,6 +5474,7 @@ requires-dist = [
     { name = "torch", specifier = ">=2.4.1" },
     { name = "torch-geometric", specifier = ">=2.7.0" },
     { name = "tqdm", specifier = ">=4.67.3" },
+    { name = "transformers", specifier = ">=5.4.0" },
 ]
 
 [package.metadata.requires-dev]
