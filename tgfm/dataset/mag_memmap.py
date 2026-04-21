@@ -6,7 +6,7 @@ from typing import Dict, List
 import numpy as np
 import torch
 from tqdm import tqdm
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 
 class MAG240MMapTextStore:
@@ -19,7 +19,7 @@ class MAG240MMapTextStore:
         self,
         csv_path: str,
         output_dir: str,
-        tokenizer: AutoTokenizer,
+        tokenizer: PreTrainedTokenizerBase,
         max_seq_len: int = 512,
         mask_rate: float = 0.15,
         force_recreate: bool = False,
