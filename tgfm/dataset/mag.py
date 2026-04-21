@@ -1,32 +1,10 @@
-import csv
 import logging
 from typing import Callable, List, Optional
 
 import torch
 from torch_geometric.data import Data, InMemoryDataset
-from tqdm import tqdm
 
 from tgfm.dataset.ogb_mag import MAG240MDataset
-
-
-class MAG240MTextStore:
-    """Read directly from CSV with caching."""
-
-    def __init__(self, csv_path: str):
-        logging.info(f'Reading csv at path: {csv_path}')
-        self.texts = {}
-        with open(csv_path, mode='r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in tqdm(reader, desc='Processing text'):
-                idx = int(row['idx'])
-                title = row['title']
-                abstract = row['abstract']
-                text = f'[CLS] {title}. {abstract} [SEP]' if title or abstract else ''
-                self.texts[idx] = text
-
-    def get_texts(self, node_ids: torch.Tensor) -> List[str]:
-        node_ids = node_ids.cpu().numpy()
-        return [self.texts.get(nid, '') for nid in node_ids]
 
 
 class MAG240MGraphDataset(InMemoryDataset):
@@ -177,26 +155,3 @@ def log_edge_index_range(edge_index: torch.Tensor) -> None:
     logging.info(
         f'Target indices range: [{min_indices[1].item()}, {max_indices[1].item()}]'
     )
-
-
-# Example usage
-if __name__ == '__main__':
-    # Initialize dataset
-    dataset = MAG240MGraphDataset(root='./data/mag240m')
-
-    print(f'Dataset: {dataset}')
-    print(f'Number of nodes: {dataset.num_nodes:,}')
-    print(f'Number of edges: {dataset.edge_index.shape[1]:,}')
-
-    # Access edge index (for use with NeighborLoader)
-    edge_index = dataset.edge_index
-    print(f'\nEdge index shape: {edge_index.shape}')
-
-    # Access node text
-    text = dataset.get_node_text(0)
-    print(f'\nNode 0 text: {text[:200]}...')
-
-    # Get multiple texts efficiently
-    texts = dataset.get_texts([0, 1, 2, 3, 4])
-    for i, t in enumerate(texts):
-        print(f'Node {i}: {t[:100]}...')
