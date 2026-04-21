@@ -6,7 +6,7 @@ from typing import Dict, List
 import numpy as np
 import torch
 from tqdm import tqdm
-from transformers import PreTrainedTokenizer
+from transformers import AutoTokenizer
 
 
 class MAG240MMapTextStore:
@@ -19,7 +19,7 @@ class MAG240MMapTextStore:
         self,
         csv_path: str,
         output_dir: str,
-        tokenizer: PreTrainedTokenizer,
+        tokenizer: AutoTokenizer,
         max_seq_len: int = 512,
         mask_rate: float = 0.15,
         force_recreate: bool = False,
@@ -236,6 +236,7 @@ class MAG240MMapTextStore:
         node_ids_np = node_ids.cpu().numpy()
 
         # Fetch from memory-mapped arrays
+        # TODO: Check the dimensions on this
         input_ids = torch.from_numpy(self.mmap_input_ids[node_ids_np].copy())
         attention_mask = torch.from_numpy(self.mmap_attention_mask[node_ids_np].copy())
         token_type_ids = torch.from_numpy(self.mmap_token_type_ids[node_ids_np].copy())
