@@ -13,6 +13,7 @@ class MAG240MTextStore:
     """Read directly from CSV with caching."""
 
     def __init__(self, csv_path: str):
+        logging.info(f'Reading csv at path: {csv_path}')
         df = pd.read_csv(csv_path, keep_default_na=False)
         self.texts = {}
         for _, row in tqdm(df.iterrows(), desc='Processing text'):
