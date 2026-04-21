@@ -1,7 +1,7 @@
+import csv
 import logging
 from typing import Callable, List, Optional
 
-import pandas as pd
 import torch
 from torch_geometric.data import Data, InMemoryDataset
 from tqdm import tqdm
@@ -14,14 +14,15 @@ class MAG240MTextStore:
 
     def __init__(self, csv_path: str):
         logging.info(f'Reading csv at path: {csv_path}')
-        df = pd.read_csv(csv_path, keep_default_na=False)
         self.texts = {}
-        for _, row in tqdm(df.iterrows(), desc='Processing text'):
-            idx = int(row['idx'])
-            title = row['title']
-            abstract = row['abstract']
-            text = f'[CLS] {title}. {abstract} [SEP]' if title or abstract else ''
-            self.texts[idx] = text
+        with open(csv_path, mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in tqdm(reader, desc='Processing text'):
+                idx = int(row['idx'])
+                title = row['title']
+                abstract = row['abstract']
+                text = f'[CLS] {title}. {abstract} [SEP]' if title or abstract else ''
+                self.texts[idx] = text
 
     def get_texts(self, node_ids: torch.Tensor) -> List[str]:
         node_ids = node_ids.cpu().numpy()
