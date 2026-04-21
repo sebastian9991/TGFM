@@ -1,6 +1,5 @@
 import logging
-import os
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional
 
 import pandas as pd
 import torch
@@ -10,19 +9,22 @@ from tqdm import tqdm
 from tgfm.dataset.ogb_mag import MAG240MDataset
 
 
-def log_edge_index_range(edge_index: torch.Tensor) -> None:
-    if edge_index.numel() == 0:
-        logging.warning('Edge index is empty, cannot compute range.')
+class MAG240MTextStore:
+    """Read directly from CSV with caching."""
 
-    min_indices, _ = edge_index.min(dim=1)
-    max_indices, _ = edge_index.max(dim=1)
+    def __init__(self, csv_path: str):
+        df = pd.read_csv(csv_path, keep_default_na=False)
+        self.texts = {}
+        for _, row in tqdm(df.iterrows(), desc='Processing text'):
+            idx = int(row['idx'])
+            title = row['title']
+            abstract = row['abstract']
+            text = f'[CLS] {title}. {abstract} [SEP]' if title or abstract else ''
+            self.texts[idx] = text
 
-    logging.info(
-        f'Source indices range: [{min_indices[0].item()}, {max_indices[0].item()}]'
-    )
-    logging.info(
-        f'Target indices range: [{min_indices[1].item()}, {max_indices[1].item()}]'
-    )
+    def get_texts(self, node_ids: torch.Tensor) -> List[str]:
+        node_ids = node_ids.cpu().numpy()
+        return [self.texts.get(nid, '') for nid in node_ids]
 
 
 class MAG240MGraphDataset(InMemoryDataset):
@@ -46,14 +48,10 @@ class MAG240MGraphDataset(InMemoryDataset):
     def __init__(
         self,
         root: str,
-        text_csv_path: Optional[str] = None,
-        idx_to_paperid_path: Optional[str] = None,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
     ):
-        self.text_csv_path = text_csv_path
-        self.idx_to_paperid_path = idx_to_paperid_path
         self._mag_dataset: Optional[MAG240MDataset] = None
 
         super().__init__(root, transform, pre_transform, pre_filter)
@@ -68,23 +66,6 @@ class MAG240MGraphDataset(InMemoryDataset):
             logging.info(f'Looking at {self.root} for unprocessed MAG Dataset.')
             self._mag_dataset = MAG240MDataset(root=self.root)
         return self._mag_dataset
-
-    def _get_text_csv_path(self) -> Tuple[str, str]:
-        """Get the path to text.csv, downloading if necessary."""
-        if self.text_csv_path is not None and self.idx_to_paperid_path is not None:
-            return (self.text_csv_path, self.idx_to_paperid_path)
-
-        # Default path
-        mapping_dir = os.path.join(self.root, 'mag240m_mapping')
-        csv_path = os.path.join(mapping_dir, 'text.csv')
-        idx_to_paperid_path = os.path.join(mapping_dir, 'paperidx2paperid.csv')
-
-        if os.path.exists(csv_path) and os.path.exists(idx_to_paperid_path):
-            return (csv_path, idx_to_paperid_path)
-        else:
-            raise FileNotFoundError(
-                f'One of paths: {csv_path}, {idx_to_paperid_path} has no text.csv or paperidx2paperid.csv file.'
-            )
 
     @property
     def raw_file_names(self) -> List[str]:
@@ -125,54 +106,12 @@ class MAG240MGraphDataset(InMemoryDataset):
         logging.info(f'Shape of edge_index: {edge_index_tensor.shape}')
         log_edge_index_range(edge_index_tensor)
 
-        # Load text CSV
-        csv_path, idx_to_paperid_path = self._get_text_csv_path()
-        logging.info(f'Loading text from {csv_path}...')
-        text_df = pd.read_csv(
-            csv_path,
-            keep_default_na=False,
-            na_values=[''],
-        )
-        logging.info(f'Loading idx_to_paperid from {idx_to_paperid_path}...')
-        pd.read_csv(idx_to_paperid_path)
-        text_df['title'] = text_df['title'].fillna('')
-        text_df['abstract'] = text_df['abstract'].fillna('')
-
-        # Get number of nodes
         num_nodes = self.mag_dataset.num_papers
-        logging.info(f'Processing {num_nodes:,} nodes...')
-
-        # Create texts list indexed by node_id
-        # Initialize with empty strings
-        texts = [''] * num_nodes
-
-        # Fill in texts from CSV
-        for _, row in tqdm(text_df.iterrows(), desc='Processing text'):
-            idx = int(row['idx'])
-            title = row['title']
-            abstract = row['abstract']
-
-            # Concatenate with a separator
-            if title and abstract:
-                text = f'{title}. {abstract}'
-            elif title:
-                text = title
-            elif abstract:
-                text = abstract
-            else:
-                text = ''
-
-            # Add [CLS] and [SEP] tokens
-            text = f'[CLS] {text} [SEP]'
-
-            texts[idx] = text
-
-        logging.info(f'Processed {len([t for t in texts if t])} non-empty texts')
+        logging.info(f'{num_nodes:,} nodes...')
 
         # Create Data object
         data = Data(
             edge_index=edge_index_tensor,
-            texts=texts,
             num_nodes=num_nodes,
         )
 
@@ -224,6 +163,21 @@ class MAG240MGraphDataset(InMemoryDataset):
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(num_nodes={self.num_nodes}, num_edges={self.edge_index.shape[1]})'
+
+
+def log_edge_index_range(edge_index: torch.Tensor) -> None:
+    if edge_index.numel() == 0:
+        logging.warning('Edge index is empty, cannot compute range.')
+
+    min_indices, _ = edge_index.min(dim=1)
+    max_indices, _ = edge_index.max(dim=1)
+
+    logging.info(
+        f'Source indices range: [{min_indices[0].item()}, {max_indices[0].item()}]'
+    )
+    logging.info(
+        f'Target indices range: [{min_indices[1].item()}, {max_indices[1].item()}]'
+    )
 
 
 # Example usage
