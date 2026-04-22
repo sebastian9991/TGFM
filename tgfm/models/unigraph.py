@@ -128,6 +128,7 @@ class UniGraph(nn.Module):
         attention_mask: torch.Tensor,
         token_type_ids: torch.Tensor,
         edge_index: torch.Tensor,
+        device: torch.device,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass through the model."""
         # Get node features from language model
@@ -138,11 +139,9 @@ class UniGraph(nn.Module):
         )
         logging.info('Forward pass from language model.')
         # TODO Check the dimensions on this
-        node_features = lm_outputs.last_hidden_state[
-            :, 0, :
-        ]  # [CLS] token as initalization to node features.
-
-        logging.info(f'Type of node features: {type(node_features)}')
+        node_features = lm_outputs.last_hidden_state[:, 0, :].to(
+            device
+        )  # [CLS] token as initalization to node features.
 
         # Get graph embeddings from GNN
         graph_embeddings = self.gnn_encoder(node_features, edge_index)

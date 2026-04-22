@@ -35,6 +35,7 @@ def train_pretrain(
     text_store: MAG240MMapTextStore,
     optimizer: torch.optim.AdamW,
     epoch: int,
+    device: torch.device,
 ) -> Tuple[float, float]:
     model.train()
     total_loss = 0
@@ -43,7 +44,7 @@ def train_pretrain(
     pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
     for batch in pbar:
         logging.info(f'batch size: {len(batch.n_id)}')
-        logging.info(f'batch edge-index: {len(batch.edge_index)}')
+        logging.info(f'batch edge-index: {batch.edge_index.shape}')
         optimizer.zero_grad()
 
         text_features = text_store.get_features(batch.n_id, apply_masking=True)
@@ -59,6 +60,7 @@ def train_pretrain(
             attention_mask,
             token_type_ids,
             batch.edge_index,
+            device,
         )
 
         loss.backward()
@@ -101,7 +103,12 @@ def run_unigraph(
 
     for epoch in range(model_args.epochs):
         pretrain_loss, pretrain_latent_loss = train_pretrain(
-            model, loader, text_store, pretrain_optimizer, epoch
+            model,
+            loader,
+            text_store,
+            pretrain_optimizer,
+            epoch,
+            model_args.device,
         )
 
         if (epoch + 1) % 10 == 0:
