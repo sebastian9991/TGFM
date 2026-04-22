@@ -84,7 +84,7 @@ def run_unigraph(
     logging.info(f'Type dataset: {type(data)}')
 
     loader = NeighborLoader(
-        dataset,
+        data,
         num_neighbors=model_args.num_neighbors,
         batch_size=model_args.batch_size,
         shuffle=True,
