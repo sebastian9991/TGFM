@@ -12,7 +12,6 @@ ExperimentArguments:
       model_args:
         model: "Unigraph"
         num_layers: 3
-        hidden_channels: 256
         num_neighbors: [10, 10]
         batch_size: 1024
         dropout: 0.2
