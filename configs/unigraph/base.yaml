@@ -19,6 +19,5 @@ ExperimentArguments:
         weight_decay: 0.001
         epochs: 100
         device: 0
-        log_steps: 10
       data_args:
         task_name: "pre-training"
