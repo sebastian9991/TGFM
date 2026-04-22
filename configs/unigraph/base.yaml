@@ -2,8 +2,8 @@ MetaArguments:
   log_file_path: "unigraph_ogb_pretraining.log"
   node_file: ""
   edge_file: ""
-  save_dir: "$SCRATCH/ogb_100m/weights/"
-  root_dir: "$SCRATCH/ogb_100m/"
+  save_dir: "ogb_100m/weights/"
+  root_dir: "ogb_100m/"
   is_scratch_location: true
   global_seed: 42
 

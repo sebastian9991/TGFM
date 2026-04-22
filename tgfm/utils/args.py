@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import yaml
 from hf_argparser import HfArgumentParser
 
-from tgfm.utils.path import get_root_dir
+from tgfm.utils.path import get_root_dir, get_scratch
 
 
 @dataclass
@@ -44,11 +44,13 @@ class MetaArguments:
         """Resolve all file and directory paths relative to the selected root directory."""
         # Select root directory
         # TODO: We now assume absolute path is given in configuration.
-        # root_dir = get_scratch() if self.is_scratch_location else get_root_dir()
+        root_dir = get_scratch() if self.is_scratch_location else get_root_dir()
 
         def resolve_paths(files: Union[str, List[str]]) -> Union[str, List[str]]:
             def resolve(f: str) -> str:
-                return str(f.lstrip('/'))
+                return str(
+                    root_dir / f.lstrip('/')
+                )  # TODO: This breaks with a List[str]?
 
             if isinstance(files, str):
                 return resolve(files)
