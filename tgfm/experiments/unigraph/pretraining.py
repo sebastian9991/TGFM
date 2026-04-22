@@ -123,10 +123,12 @@ def main() -> None:
     save_dir = Path(str(meta_args.save_dir))  # TODO: Throw when its a list[str]
     dataset = MAG240MGraphDataset(root=args.root_dir)
     tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+    logging.info('Tokenizer loaded.')
     text_store = MAG240MMapTextStore(
         output_dir=args.output_memmap_path,
         tokenizer=tokenizer,
     )
+    logging.info('Text store loaded.')
 
     for experiment, experiment_arg in experiment_args.exp_args.items():
         logging.info(f'\n***Running*** {experiment}')
