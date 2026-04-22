@@ -53,13 +53,14 @@ def train_pretrain(
         masked_input_ids = text_features['masked_input_ids'].cuda()
         attention_mask = text_features['attention_mask'].cuda()
         token_type_ids = text_features['token_type_ids'].cuda()
+        edge_index = batch.edge_index.to(device)
 
         loss, latent_loss = model(
             input_ids,
             masked_input_ids,
             attention_mask,
             token_type_ids,
-            batch.edge_index,
+            edge_index,
             device,
         )
 
