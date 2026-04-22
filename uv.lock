@@ -2830,17 +2830,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyg-lib"
-version = "0.6.0+pt28cu129"
-source = { registry = "https://data.pyg.org/whl/torch-2.8.0+cu129.html" }
-wheels = [
-    { url = "https://data.pyg.org/whl/torch-2.8.0%2Bcu129/pyg_lib-0.6.0%2Bpt28cu129-cp311-cp311-win_amd64.whl" },
-    { url = "https://data.pyg.org/whl/torch-2.8.0%2Bcu129/pyg_lib-0.6.0%2Bpt28cu129-cp312-cp312-win_amd64.whl" },
-    { url = "https://data.pyg.org/whl/torch-2.8.0%2Bcu129/pyg_lib-0.6.0%2Bpt28cu129-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://data.pyg.org/whl/torch-2.8.0%2Bcu129/pyg_lib-0.6.0%2Bpt28cu129-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl" },
-]
-
-[[package]]
 name = "pygments"
 version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3521,7 +3510,6 @@ dependencies = [
     { name = "hf-argparser" },
     { name = "numpy" },
     { name = "pre-commit" },
-    { name = "pyg-lib" },
     { name = "torch" },
     { name = "torch-geometric" },
     { name = "tqdm" },
@@ -3545,7 +3533,6 @@ requires-dist = [
     { name = "hf-argparser", specifier = ">=0.1.1" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "pyg-lib", specifier = ">=0.6.0" },
     { name = "torch", specifier = ">=2.4.1" },
     { name = "torch-geometric", specifier = ">=2.7.0" },
     { name = "tqdm", specifier = ">=4.67.3" },
