@@ -142,6 +142,8 @@ class UniGraph(nn.Module):
             :, 0, :
         ]  # [CLS] token as initalization to node features.
 
+        logging.info(f'Type of node features: {type(node_features)}')
+
         # Get graph embeddings from GNN
         graph_embeddings = self.gnn_encoder(node_features, edge_index)
         logging.info('Graph Embeddings generated')
