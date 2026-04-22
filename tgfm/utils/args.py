@@ -28,9 +28,6 @@ class MetaArguments:
             'help': 'A csv or list of csv files containing the nodes of the graph.'
         },
     )
-    save_dir: Union[str, List[str]] = field(
-        metadata={'help': 'The location to save and load model weights etc.'},
-    )
     global_seed: int = field(
         default=42,
         metadata={'help': 'Random seed to use for reproducibiility.'},
@@ -58,7 +55,6 @@ class MetaArguments:
 
         self.node_file = resolve_paths(self.node_file)
         self.edge_file = resolve_paths(self.edge_file)
-        self.save_dir = resolve_paths(self.save_dir)
         self.root_dir = resolve_paths(self.root_dir)
 
         if self.log_file_path is not None:

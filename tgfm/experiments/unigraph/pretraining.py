@@ -120,12 +120,12 @@ def main() -> None:
     meta_args, experiment_args = parse_args(config_file_path)
     seed_everything(meta_args.global_seed)
     setup_logging(meta_args.log_file_path)
-    save_dir = Path(str(meta_args.save_dir))  # TODO: Throw when its a list[str]
-    dataset = MAG240MGraphDataset(root=str(meta_args.root_dir))
+    root_dir = Path(str(meta_args.root_dir))  # TODO: Throw when its a list[str]
+    dataset = MAG240MGraphDataset(root=str(root_dir))
     tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
     logging.info('Tokenizer loaded.')
     text_store = MAG240MMapTextStore(
-        output_dir=args.output_memmap_path,
+        output_dir=str(root_dir / 'mag240m_mapping'),
         tokenizer=tokenizer,
     )
     logging.info('Text store loaded.')
@@ -136,7 +136,7 @@ def main() -> None:
             model_args=experiment_arg.model_args,
             dataset=dataset,
             text_store=text_store,
-            save_dir=save_dir,
+            save_dir=root_dir / 'weights',
         )
 
 
