@@ -7,6 +7,7 @@
 }.
 """
 
+import logging
 from typing import Any, Dict, Tuple
 
 import torch
@@ -135,13 +136,15 @@ class UniGraph(nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
         )
+        logging.info('Forward pass from language model.')
         # TODO Check the dimensions on this
         node_features = lm_outputs.last_hidden_state[
-            :, 0
+            :, 0, :
         ]  # [CLS] token as initalization to node features.
 
         # Get graph embeddings from GNN
-        graph_embeddings = self.gnn_encoder(edge_index, node_features)
+        graph_embeddings = self.gnn_encoder(node_features, edge_index)
+        logging.info('Graph Embeddings generated')
 
         # Combine LM and GNN outputs
         combined = self.fusion(torch.cat([node_features, graph_embeddings], dim=-1))
