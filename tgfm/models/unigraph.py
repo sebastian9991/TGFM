@@ -152,6 +152,7 @@ class UniGraph(nn.Module):
 
         # Compute MLM loss
         mlm_logits = self.mlm_head(combined)
+        logging.info(f'mlm_logits shape: {mlm_logits.shape}')
         mlm_loss = compute_mlm_loss(mlm_logits, input_ids, masked_input_ids)
 
         # Initialize latent loss
