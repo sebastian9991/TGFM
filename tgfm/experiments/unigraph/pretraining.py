@@ -42,6 +42,7 @@ def train_pretrain(
 
     pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
     for batch in pbar:
+        logging.info(f'batch size: {batch.shape}')
         optimizer.zero_grad()
 
         text_features = text_store.get_features(batch.n_id, apply_masking=True)
