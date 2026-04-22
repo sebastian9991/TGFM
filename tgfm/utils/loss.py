@@ -9,6 +9,7 @@ def compute_mlm_loss(
 ) -> torch.Tensor:
     mask = input_ids != masked_input_ids
     logging.info(f'mask: {mask}')
+    logging.info(f'masked_input_ids values: {masked_input_ids}')
 
     target_ids = input_ids[mask]
     logging.info(f'target_ids: {target_ids}')

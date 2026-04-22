@@ -144,6 +144,7 @@ class UniGraph(nn.Module):
         )  # [CLS] token as initalization to node features.
 
         # Get graph embeddings from GNN
+        logging.info(f'Node feature dimensions: {node_features.shape}')
         graph_embeddings = self.gnn_encoder(node_features, edge_index)
         logging.info('Graph Embeddings generated')
 
@@ -167,7 +168,7 @@ class UniGraph(nn.Module):
                     attention_mask=attention_mask,
                     token_type_ids=token_type_ids,
                 )
-                target_node_features = target_lm_outputs.last_hidden_state[:, 0]
+                target_node_features = target_lm_outputs.last_hidden_state[:, 0, :]
                 target_graph_embeddings = self.target_gnn_encoder(
                     edge_index, target_node_features
                 )
