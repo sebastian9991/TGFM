@@ -37,7 +37,7 @@ class MAG240MGraphDataset(InMemoryDataset):
         super().__init__(root, transform, pre_transform, pre_filter)
 
         # Load the processed data into memory
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data = torch.load(self.processed_paths[0])
 
     @property
     def mag_dataset(self) -> MAG240MDataset:
