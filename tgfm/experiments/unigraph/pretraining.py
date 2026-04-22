@@ -80,6 +80,8 @@ def run_unigraph(
 ) -> None:
     assert isinstance(model_args, UnigraphArguments)
     data = dataset[0]
+    logging.info(f'Type dataset: {type(dataset)}')
+    logging.info(f'Type dataset: {type(data)}')
 
     loader = NeighborLoader(
         data,
