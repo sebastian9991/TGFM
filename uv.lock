@@ -1733,6 +1733,18 @@ wheels = [
 ]
 
 [[package]]
+name = "hf-argparser"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/31/8fc8e22c8b05dc68c97fd483017ecda08c48e478a77a94f492864afceadb/hf_argparser-0.1.1.tar.gz", hash = "sha256:9290e503b85eadd7ee90cb2790eaeefc8e2d593bfd1bbff745af435f5dcc83bc", size = 17578, upload-time = "2023-10-10T21:56:48.037Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/8a/55985913b461883f9fe6c9979bdfb1e6e3f9b43121ff3010b7511f28aa00/hf_argparser-0.1.1-py3-none-any.whl", hash = "sha256:7e8766e5509486b3a88fcb38cbc5a45fc907628762bd86faebb76ad9a0f6541e", size = 11926, upload-time = "2023-10-10T21:56:46.989Z" },
+]
+
+[[package]]
 name = "hf-xet"
 version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -5447,6 +5459,7 @@ name = "tgfm"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "hf-argparser" },
     { name = "numpy" },
     { name = "pre-commit" },
     { name = "torch" },
@@ -5469,6 +5482,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "hf-argparser", specifier = ">=0.1.1" },
     { name = "numpy", specifier = ">=2.2.6" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "torch", specifier = ">=2.4.1" },
