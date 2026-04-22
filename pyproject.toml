@@ -3,11 +3,12 @@ name = "tgfm"
 version = "0.1.0"
 description = "Text-Graph Foundation Model."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11, <3.13"
 dependencies = [
     "hf-argparser>=0.1.1",
     "numpy>=2.2.6",
     "pre-commit>=4.5.1",
+    "pyg-lib>=0.6.0",
     "torch>=2.4.1",
     "torch-geometric>=2.7.0",
     "tqdm>=4.67.3",
@@ -32,8 +33,6 @@ name = "tgfm"
 [build-system]
 requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
-
-
 
 
 
