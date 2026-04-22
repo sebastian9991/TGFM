@@ -121,7 +121,7 @@ def main() -> None:
     seed_everything(meta_args.global_seed)
     setup_logging(meta_args.log_file_path)
     save_dir = Path(str(meta_args.save_dir))  # TODO: Throw when its a list[str]
-    dataset = MAG240MGraphDataset(root=args.root_dir)
+    dataset = MAG240MGraphDataset(root=str(meta_args.root_dir))
     tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
     logging.info('Tokenizer loaded.')
     text_store = MAG240MMapTextStore(
