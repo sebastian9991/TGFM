@@ -1,7 +1,7 @@
 import csv
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
@@ -17,14 +17,13 @@ class MAG240MMapTextStore:
 
     def __init__(
         self,
-        csv_path: str,
         output_dir: str,
         tokenizer: PreTrainedTokenizerBase,
+        csv_path: Optional[str] = None,
         max_seq_len: int = 512,
         mask_rate: float = 0.15,
         force_recreate: bool = False,
     ):
-        self.csv_path = Path(csv_path)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -45,6 +44,7 @@ class MAG240MMapTextStore:
             logging.info('Memory-mapped files already exist. Loading metadata...')
             self._load_metadata()
         else:
+            self.csv_path = Path(str(csv_path))
             logging.info('Creating memory-mapped files...')
             self._create_mmap_features()
 
