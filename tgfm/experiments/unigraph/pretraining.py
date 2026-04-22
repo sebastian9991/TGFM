@@ -45,6 +45,7 @@ def train_pretrain(
     for batch in pbar:
         logging.info(f'batch size: {len(batch.n_id)}')
         logging.info(f'batch edge-index: {batch.edge_index.shape}')
+        logging.info(f'batch n_id: {batch.n_id}')
         optimizer.zero_grad()
 
         text_features = text_store.get_features(batch.n_id, apply_masking=True)
