@@ -158,13 +158,6 @@ class GAT(nn.Module):
         else:
             return out
 
-    def reset_classifier(self, num_classes: int) -> None:
-        """Reset the output head for a new number of classes."""
-        final_dim = (
-            self.out_dim * self.convs[-1].heads if self.concat_out else self.out_dim
-        )
-        self.head = nn.Linear(final_dim, num_classes)
-
 
 if __name__ == '__main__':
     # Model configuration
