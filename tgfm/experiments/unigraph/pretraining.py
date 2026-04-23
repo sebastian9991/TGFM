@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
-from torch_geometric.loader import ClusterData, ClusterLoader
+from torch_geometric.loader import ClusterLoader, NeighborLoader
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
@@ -43,11 +43,10 @@ def train_pretrain(
 
     pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
     for batch in pbar:
-        # logging.info(f'batch size: {batch.batch_size}')
-        # logging.info(f'Number of ids: {len(batch.n_id)}')
-        # logging.info(f'batch edge-index: {batch.edge_index.shape}')
-        # logging.info(f'batch n_id: {batch.n_id}')
-        logging.info(f'batch: {batch}')
+        logging.info(f'batch size: {batch.batch_size}')
+        logging.info(f'Number of ids: {len(batch.n_id)}')
+        logging.info(f'batch edge-index: {batch.edge_index.shape}')
+        logging.info(f'batch n_id: {batch.n_id}')
         optimizer.zero_grad()
 
         text_features = text_store.get_features(batch.n_id, apply_masking=True)
@@ -87,7 +86,7 @@ def train_pretrain(
 
 def run_unigraph(
     model_args: ModelArguments,
-    dataset: ClusterData,
+    dataset: MAG240MGraphDataset,
     text_store: MAG240MMapTextStore,
     save_dir: Path,
 ) -> None:
@@ -96,16 +95,16 @@ def run_unigraph(
     logging.info(f'Type dataset: {type(dataset)}')
     logging.info(f'Type dataset: {type(data)}')
 
-    # loader = NeighborLoader(
-    #     data,
-    #     input_nodes=torch.arange(data.num_nodes),
-    #     num_neighbors=model_args.num_neighbors,
-    #     batch_size=model_args.batch_size,
-    #     shuffle=True,
-    #     num_workers=4,
-    #     prefetch_factor=2,
-    #     persistent_workers=True,
-    # )
+    loader = NeighborLoader(
+        data,
+        input_nodes=torch.arange(data.num_nodes),
+        num_neighbors=model_args.num_neighbors,
+        batch_size=model_args.batch_size,
+        shuffle=True,
+        num_workers=4,
+        prefetch_factor=2,
+        persistent_workers=True,
+    )
 
     loader = ClusterLoader(cluster_data=dataset, batch_size=1)
 
@@ -147,11 +146,11 @@ def main() -> None:
     setup_logging(meta_args.log_file_path)
     root_dir = Path(str(meta_args.root_dir))  # TODO: Throw when its a list[str]
     dataset = MAG240MGraphDataset(root=str(root_dir))
-    cluster_data = ClusterData(
-        dataset[0],
-        num_parts=dataset[0].num_nodes // 64,
-        save_dir=dataset.processed_dir,
-    )
+    # cluster_data = ClusterData(
+    #     dataset[0],
+    #     num_parts=dataset[0].num_nodes // 64,
+    #     save_dir=dataset.processed_dir,
+    # )
     logging.info(f'Clustered Graph Data.')
     tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
     logging.info('Tokenizer loaded.')
@@ -165,7 +164,7 @@ def main() -> None:
         logging.info(f'\n***Running*** {experiment}')
         run_unigraph(
             model_args=experiment_arg.model_args,
-            dataset=cluster_data,
+            dataset=dataset,
             text_store=text_store,
             save_dir=root_dir / 'weights',
         )
