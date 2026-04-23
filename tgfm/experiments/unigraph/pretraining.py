@@ -43,8 +43,8 @@ def train_pretrain(
 
     pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
     for batch in pbar:
-        logging.info(f'n_id length: {len(batch.n_id)}')
-        logging.info(f'n_id length: {batch.batch_size}')
+        logging.info(f'batch size: {batch.batch_size}')
+        logging.info(f'Number of ids: {len(batch.n_id)}')
         logging.info(f'batch edge-index: {batch.edge_index.shape}')
         logging.info(f'batch n_id: {batch.n_id}')
         optimizer.zero_grad()
@@ -56,6 +56,10 @@ def train_pretrain(
         attention_mask = text_features['attention_mask'].cuda()  # [B, seq]
         token_type_ids = text_features['token_type_ids'].cuda()  # [B, seq]
         edge_index = batch.edge_index.to(device)  # [2, num_edges]
+
+        logging.info(
+            f'Shape of input_ids, masked_input_ids, attention_mask, token_type_ids: {input_ids.shape}, {masked_input_ids.shape}, {attention_mask.shape}, {token_type_ids.shape}'
+        )
 
         loss, latent_loss = model(
             input_ids,
