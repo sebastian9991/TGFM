@@ -7,7 +7,6 @@
 }.
 """
 
-import logging
 from typing import Tuple
 
 import torch
@@ -136,27 +135,18 @@ class UniGraph(nn.Module):
             input_ids=masked_input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-        )
-        logging.info('Forward pass from language model.')
-        logging.info(f'LM outputs dimension: {lm_outputs.last_hidden_state.shape}')
-        # TODO Check the dimensions on this
+        )  # last_hidden_state [B, seq, dim]
         node_features = lm_outputs.last_hidden_state[:, 0, :].to(
             device
         )  # [CLS] token as initalization to node features.
 
         # Get graph embeddings from GNN
-        logging.info(f'Node feature dimensions: {node_features.shape}')
-        graph_embeddings = self.gnn_encoder(node_features, edge_index)
-        logging.info(f'Graph embeddings shape: {graph_embeddings.shape}')
+        graph_embeddings = self.gnn_encoder(node_features, edge_index)  # [B, dim]
 
         # Combine LM and GNN outputs
-        logging.info(
-            f'Dimenion of T node features: {torch.transpose(node_features, 0, 1).shape}'
-        )
         graph_embedding_matrix = torch.matmul(
             torch.ones((512, len(node_features))).to(device), graph_embeddings
-        ).to(device)
-        logging.info(f'Graph embedding matrix shape: {graph_embedding_matrix.shape}')
+        ).to(device)  # [seq, 2*dim]
         concatenated_lm_graph_embeddings = torch.cat(
             [
                 lm_outputs.last_hidden_state,
@@ -165,16 +155,11 @@ class UniGraph(nn.Module):
                 ),
             ],
             dim=2,
-        )  # (B, seq, dim) -> (B, seq, 2*dim)
-        logging.info(
-            f'concatenated_lm_graph_embeddings shape: {concatenated_lm_graph_embeddings.shape}'
-        )
-        combined = self.fusion(concatenated_lm_graph_embeddings)
-        logging.info(f'Combined dimension: {combined.shape}')
+        )  # (B, seq, dim) -> (B, seq, 2*dim) []
+        combined = self.fusion(concatenated_lm_graph_embeddings)  # [B, seq, dim]
 
         # Compute MLM loss
-        mlm_logits = self.mlm_head(combined)
-        logging.info(f'mlm_logits shape: {mlm_logits.shape}')
+        mlm_logits = self.mlm_head(combined)  # [B, seq, vocab_dim]
         mlm_loss = compute_mlm_loss(mlm_logits, input_ids, masked_input_ids)
 
         # Initialize latent loss
