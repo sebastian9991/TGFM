@@ -195,7 +195,7 @@ class UniGraph(nn.Module):
                 )
                 target_graph_embedding_matrix = torch.matmul(
                     torch.ones((512, len(target_node_features))).to(device),
-                    target_node_features,
+                    target_graph_embeddings,
                 ).to(device)
                 target_concatenated_lm_graph_embeddings = torch.cat(
                     [
