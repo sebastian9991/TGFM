@@ -23,7 +23,7 @@ def compute_mlm_loss(
 
     loss = loss_fct(
         mlm_logits.view(-1, mlm_logits.size(-1)),  # [batch_size*seq_len, vocab_size]
-        labels.view(-1),  # [batch_size*seq_len]
+        labels.view(-1).long(),  # [batch_size*seq_len]
     )
 
     return loss
