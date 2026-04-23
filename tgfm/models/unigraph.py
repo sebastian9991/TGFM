@@ -144,6 +144,7 @@ class UniGraph(nn.Module):
         graph_embeddings = self.gnn_encoder(node_features, edge_index)  # [B, dim]
 
         # Combine LM and GNN outputs
+        # TODO: Is there a more efficient way to do this? Create torch.ones() per forward pass seems inefficient
         graph_embedding_matrix = torch.matmul(
             torch.ones((512, len(node_features))).to(device), graph_embeddings
         ).to(device)  # [seq, 2*dim]

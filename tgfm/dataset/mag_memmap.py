@@ -44,7 +44,8 @@ class MAG240MMapTextStore:
             logging.info('Memory-mapped files already exist. Loading metadata...')
             self._load_metadata()
         else:
-            self.csv_path = Path(str(csv_path))
+            assert csv_path is not None
+            self.csv_path = Path(csv_path)
             logging.info('Creating memory-mapped files...')
             self._create_mmap_features()
 
