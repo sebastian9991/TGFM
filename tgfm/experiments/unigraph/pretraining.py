@@ -106,7 +106,7 @@ def run_unigraph(
     #     persistent_workers=True,
     # )
 
-    loader = ClusterLoader(data=dataset, batch_size=1)
+    loader = ClusterLoader(cluster_data=dataset, batch_size=1)
 
     model = UniGraph(model_args).to(model_args.device)
 
@@ -148,7 +148,7 @@ def main() -> None:
     dataset = MAG240MGraphDataset(root=str(root_dir))
     cluster_data = ClusterData(
         dataset[0],
-        num_parts=dataset[0].num_nodes // 128,
+        num_parts=dataset[0].num_nodes // 64,
         save_dir=dataset.processed_dir,
     )
     logging.info(f'Clustered Graph Data.')
