@@ -155,7 +155,7 @@ class UniGraph(nn.Module):
         )
         graph_embedding_matrix = torch.matmul(
             torch.ones((512, len(node_features))), node_features
-        )
+        ).to(device)
         logging.info(f'Graph embedding matrix shape: {graph_embedding_matrix.shape}')
         combined = self.fusion(
             torch.cat(
