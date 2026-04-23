@@ -109,7 +109,7 @@ class UniGraph(nn.Module):
         yield from self.target_fuse_norm.parameters()
         yield from self.target_projector.parameters()
 
-    def _online_parameters_for_ema(self) -> Iterator[torch.nn.Paramater]:
+    def _online_parameters_for_ema(self) -> Iterator[torch.nn.Parameter]:
         yield from self.gnn_encoder.parameters()
         yield from self.fuse_lm.parameters()
         yield from self.fuse_gnn.parameters()
