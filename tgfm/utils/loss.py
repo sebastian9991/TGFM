@@ -7,17 +7,23 @@ import torch.nn as nn
 def compute_mlm_loss(
     mlm_logits: torch.Tensor, input_ids: torch.Tensor, masked_input_ids: torch.Tensor
 ) -> torch.Tensor:
+    """Compute the MLM loss on masked positions.
+    mlm_logits: [batch_size, seq_len, vocab_size]
+    input_ids: [batch_size, seq_len]
+    masked_input_ids: [batch_size, seq_len].
+    """
     mask = input_ids != masked_input_ids
-    logging.info(f'mask: {mask}')
-    logging.info(f'masked_input_ids values: {masked_input_ids}')
+    logging.info(f'mask: {mask.shape}')
+    logging.info(f'masked_input_ids values: {masked_input_ids.shape}')
 
-    target_ids = input_ids[mask]
-    logging.info(f'target_ids: {target_ids}')
+    labels = input_ids.clone()
+    labels[input_ids == masked_input_ids] = -100  # unmasked positions ignored
 
-    assert target_ids.shape[0] == mlm_logits.shape[0], (
-        f'Shape mismatch: Logits {mlm_logits.shape}, Targets {target_ids.shape}. '
-        'Ensure exactly one token is masked per batch item.'
+    loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
+
+    loss = loss_fct(
+        mlm_logits.view(-1, mlm_logits.size(-1)),  # [batch_size*seq_len, vocab_size]
+        labels.view(-1),  # [batch_size*seq_len]
     )
 
-    loss_fct = nn.CrossEntropyLoss()
-    return loss_fct(mlm_logits, target_ids)
+    return loss
