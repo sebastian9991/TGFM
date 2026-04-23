@@ -141,7 +141,7 @@ def main() -> None:
     root_dir = Path(str(meta_args.root_dir))  # TODO: Throw when its a list[str]
     dataset = MAG240MGraphDataset(root=str(root_dir))
     cluster_data = ClusterData(
-        dataset[0], num_parts=dataset[0].num_node // 32, save_dir=dataset.processed_dir
+        dataset[0], num_parts=dataset[0].num_nodes // 32, save_dir=dataset.processed_dir
     )
     logging.info(f'Clustered Graph Data.')
     tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
