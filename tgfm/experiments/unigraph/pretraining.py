@@ -42,6 +42,9 @@ def train_pretrain(
 
     pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
     for batch in pbar:
+        if batch.edge_index.numel() == 0:
+            continue
+
         logging.info(f'batch size: {batch.batch_size}')
         logging.info(f'Number of ids: {len(batch.n_id)}')
         logging.info(f'batch edge-index: {batch.edge_index.shape}')
