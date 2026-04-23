@@ -151,23 +151,25 @@ class UniGraph(nn.Module):
 
         # Combine LM and GNN outputs
         logging.info(
-            f'Dimenion of T node features: {torch.transpose(node_features, 0, 1)}'
+            f'Dimenion of T node features: {torch.transpose(node_features, 0, 1).shape}'
         )
         graph_embedding_matrix = torch.matmul(
             torch.ones((512, len(node_features))).to(device), node_features
         ).to(device)
         logging.info(f'Graph embedding matrix shape: {graph_embedding_matrix.shape}')
-        combined = self.fusion(
-            torch.cat(
-                [
-                    lm_outputs.last_hidden_state,
-                    graph_embedding_matrix.expand(
-                        lm_outputs.last_hidden_state.shape[0], -1, -1
-                    ),
-                ],
-                dim=2,
-            )  # (B, seq, dim) -> (B, seq, 2*dim)
+        concatenated_lm_graph_embeddings = torch.cat(
+            [
+                lm_outputs.last_hidden_state,
+                graph_embedding_matrix.expand(
+                    lm_outputs.last_hidden_state.shape[0], -1, -1
+                ),
+            ],
+            dim=2,
+        )  # (B, seq, dim) -> (B, seq, 2*dim)
+        logging.info(
+            f'concatenated_lm_graph_embeddings shape: {concatenated_lm_graph_embeddings.shape}'
         )
+        combined = self.fusion(concatenated_lm_graph_embeddings)
         logging.info(f'Combined dimension: {combined.shape}')
 
         # Compute MLM loss
