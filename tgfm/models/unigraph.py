@@ -8,7 +8,7 @@
 """
 
 import logging
-from typing import Any, Dict, Tuple
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -154,7 +154,7 @@ class UniGraph(nn.Module):
             f'Dimenion of T node features: {torch.transpose(node_features, 0, 1).shape}'
         )
         graph_embedding_matrix = torch.matmul(
-            torch.ones((512, len(node_features))).to(device), node_features
+            torch.ones((512, len(node_features))).to(device), graph_embeddings
         ).to(device)
         logging.info(f'Graph embedding matrix shape: {graph_embedding_matrix.shape}')
         concatenated_lm_graph_embeddings = torch.cat(
@@ -191,10 +191,23 @@ class UniGraph(nn.Module):
                 )
                 target_node_features = target_lm_outputs.last_hidden_state[:, 0, :]
                 target_graph_embeddings = self.target_gnn_encoder(
-                    edge_index, target_node_features
+                    target_node_features, edge_index
                 )
+                target_graph_embedding_matrix = torch.matmul(
+                    torch.ones((512, len(target_node_features))).to(device),
+                    target_node_features,
+                ).to(device)
+                target_concatenated_lm_graph_embeddings = torch.cat(
+                    [
+                        target_lm_outputs.last_hidden_state,
+                        target_graph_embedding_matrix.expand(
+                            target_lm_outputs.last_hidden_state.shape[0], -1, -1
+                        ),
+                    ],
+                    dim=2,
+                )  # (B, seq, dim) -> (B, seq, 2*dim)
                 target_combined = self.target_fusion(
-                    torch.cat([target_node_features, target_graph_embeddings], dim=-1)
+                    target_concatenated_lm_graph_embeddings
                 )
                 target_embeddings = self.target_projector(target_combined)
 
@@ -212,15 +225,16 @@ class UniGraph(nn.Module):
 
         return total_loss, latent_loss
 
-    def get_embeddings(self, batch: Dict[str, Any]) -> torch.Tensor:
+    def get_embeddings(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        token_type_ids: torch.Tensor,
+        edge_index: torch.Tensor,
+        device: torch.device,
+    ) -> torch.Tensor:
         """Get node embeddings for inference."""
         with torch.no_grad():
-            # Get inputs
-            input_ids = batch['input_ids']
-            attention_mask = batch['attention_mask']
-            token_type_ids = batch['token_type_ids']
-            graph = batch['graph']
-
             # Get node features from language model
             lm_outputs = self.lm_encoder(
                 input_ids=input_ids,
@@ -229,10 +243,20 @@ class UniGraph(nn.Module):
             )
             node_features = lm_outputs.last_hidden_state[:, 0, :]
 
-            # Get graph embeddings from GNN
-            graph_embeddings = self.gnn_encoder(graph, node_features)
+            graph_embeddings = self.gnn_encoder(node_features, edge_index)
 
-            # Combine LM and GNN outputs
-            combined = self.fusion(torch.cat([node_features, graph_embeddings], dim=-1))
+            graph_embedding_matrix = torch.matmul(
+                torch.ones((512, len(node_features))).to(device), graph_embeddings
+            ).to(device)
+            concatenated_lm_graph_embeddings = torch.cat(
+                [
+                    lm_outputs.last_hidden_state,
+                    graph_embedding_matrix.expand(
+                        lm_outputs.last_hidden_state.shape[0], -1, -1
+                    ),
+                ],
+                dim=2,
+            )  # (B, seq, dim) -> (B, seq, 2*dim)
+            combined = self.fusion(concatenated_lm_graph_embeddings)
 
             return combined
