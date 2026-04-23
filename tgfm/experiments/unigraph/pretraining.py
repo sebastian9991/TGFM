@@ -96,10 +96,13 @@ def run_unigraph(
 
     loader = NeighborLoader(
         data,
+        input_nodes=torch.arange(data.num_nodes),
         num_neighbors=model_args.num_neighbors,
         batch_size=model_args.batch_size,
         shuffle=True,
         num_workers=4,
+        prefetch_factor=2,
+        persistent_workers=True,
     )
 
     model = UniGraph(model_args).to(model_args.device)
