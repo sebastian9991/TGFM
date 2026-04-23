@@ -43,10 +43,11 @@ def train_pretrain(
 
     pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
     for batch in pbar:
-        logging.info(f'batch size: {batch.batch_size}')
-        logging.info(f'Number of ids: {len(batch.n_id)}')
-        logging.info(f'batch edge-index: {batch.edge_index.shape}')
-        logging.info(f'batch n_id: {batch.n_id}')
+        # logging.info(f'batch size: {batch.batch_size}')
+        # logging.info(f'Number of ids: {len(batch.n_id)}')
+        # logging.info(f'batch edge-index: {batch.edge_index.shape}')
+        # logging.info(f'batch n_id: {batch.n_id}')
+        logging.info(f'batch: {batch}')
         optimizer.zero_grad()
 
         text_features = text_store.get_features(batch.n_id, apply_masking=True)
