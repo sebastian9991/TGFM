@@ -138,6 +138,7 @@ class UniGraph(nn.Module):
             token_type_ids=token_type_ids,
         )
         logging.info('Forward pass from language model.')
+        logging.info(f'LM outputs dimension: {lm_outputs.shape}')
         # TODO Check the dimensions on this
         node_features = lm_outputs.last_hidden_state[:, 0, :].to(
             device
@@ -146,10 +147,11 @@ class UniGraph(nn.Module):
         # Get graph embeddings from GNN
         logging.info(f'Node feature dimensions: {node_features.shape}')
         graph_embeddings = self.gnn_encoder(node_features, edge_index)
-        logging.info('Graph Embeddings generated')
+        logging.info(f'Graph embeddings shape: {graph_embeddings.shape}')
 
         # Combine LM and GNN outputs
         combined = self.fusion(torch.cat([node_features, graph_embeddings], dim=-1))
+        logging.info(f'Combined dimension: {combined.shape}')
 
         # Compute MLM loss
         mlm_logits = self.mlm_head(combined)
@@ -206,7 +208,7 @@ class UniGraph(nn.Module):
                 attention_mask=attention_mask,
                 token_type_ids=token_type_ids,
             )
-            node_features = lm_outputs.last_hidden_state[:, 0]
+            node_features = lm_outputs.last_hidden_state[:, 0, :]
 
             # Get graph embeddings from GNN
             graph_embeddings = self.gnn_encoder(graph, node_features)
