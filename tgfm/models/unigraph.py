@@ -138,7 +138,7 @@ class UniGraph(nn.Module):
             token_type_ids=token_type_ids,
         )
         logging.info('Forward pass from language model.')
-        logging.info(f'LM outputs dimension: {lm_outputs.shape}')
+        logging.info(f'LM outputs dimension: {lm_outputs.last_hidden_state.shape}')
         # TODO Check the dimensions on this
         node_features = lm_outputs.last_hidden_state[:, 0, :].to(
             device
