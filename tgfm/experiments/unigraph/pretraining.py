@@ -6,8 +6,7 @@ from typing import Tuple
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from torch_geometric.data import InMemoryDataset
-from torch_geometric.loader import NeighborLoader
+from torch_geometric.loader import ClusterData, ClusterLoader
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
@@ -85,22 +84,23 @@ def train_pretrain(
 
 def run_unigraph(
     model_args: ModelArguments,
-    dataset: InMemoryDataset,
+    cluster_data: ClusterData,
     text_store: MAG240MMapTextStore,
     save_dir: Path,
 ) -> None:
     assert isinstance(model_args, UnigraphArguments)
-    data = dataset[0]
-    logging.info(f'Type dataset: {type(dataset)}')
-    logging.info(f'Type dataset: {type(data)}')
+    # data = dataset[0]
+    # logging.info(f"Type dataset: {type(dataset)}")
+    # logging.info(f"Type dataset: {type(data)}")
 
-    loader = NeighborLoader(
-        data,
-        num_neighbors=model_args.num_neighbors,
-        batch_size=model_args.batch_size,
-        shuffle=True,
-        num_workers=4,
-    )
+    # loader = NeighborLoader(
+    #     data,
+    #     num_neighbors=model_args.num_neighbors,
+    #     batch_size=model_args.batch_size,
+    #     shuffle=True,
+    #     num_workers=4,
+    # )
+    loader = ClusterLoader(cluster_data, batch_size=1, shuffle=True)
 
     model = UniGraph(model_args).to(model_args.device)
 
@@ -140,6 +140,10 @@ def main() -> None:
     setup_logging(meta_args.log_file_path)
     root_dir = Path(str(meta_args.root_dir))  # TODO: Throw when its a list[str]
     dataset = MAG240MGraphDataset(root=str(root_dir))
+    cluster_data = ClusterData(
+        dataset[0], num_parts=dataset[0].num_node // 32, save_dir=dataset.processed_dir
+    )
+    logging.info(f'Clustered Graph Data.')
     tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
     logging.info('Tokenizer loaded.')
     text_store = MAG240MMapTextStore(
@@ -152,7 +156,7 @@ def main() -> None:
         logging.info(f'\n***Running*** {experiment}')
         run_unigraph(
             model_args=experiment_arg.model_args,
-            dataset=dataset,
+            cluster_data=cluster_data,
             text_store=text_store,
             save_dir=root_dir / 'weights',
         )
