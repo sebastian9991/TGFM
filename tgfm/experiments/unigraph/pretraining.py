@@ -5,6 +5,7 @@ from typing import Tuple
 
 import torch
 from torch import nn
+from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.loader import NeighborLoader
@@ -61,14 +62,15 @@ def train_pretrain(
             f'Shape of input_ids, masked_input_ids, attention_mask, token_type_ids: {input_ids.shape}, {masked_input_ids.shape}, {attention_mask.shape}, {token_type_ids.shape}'
         )
 
-        loss, latent_loss = model(
-            input_ids,
-            masked_input_ids,
-            attention_mask,
-            token_type_ids,
-            edge_index,
-            device,
-        )
+        with autocast():  # Uses FP16 if possible.
+            loss, latent_loss = model(
+                input_ids,
+                masked_input_ids,
+                attention_mask,
+                token_type_ids,
+                edge_index,
+                device,
+            )
 
         loss.backward()
         optimizer.step()
