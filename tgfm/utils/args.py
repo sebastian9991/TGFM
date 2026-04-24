@@ -110,6 +110,7 @@ class UnigraphArguments(ModelArguments):
     nhead: int = field(default=8)
     activation: str = field(default='gelu')
     norm: str = field(default='layernorm')
+    gradient_checkpointing: bool = field(default=False)
     negative_slope: float = field(default=0.2)
     batch_size: int = field(default=32)
     mask_rate: float = field(default=0.15)
