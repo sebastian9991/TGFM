@@ -60,17 +60,17 @@ def train_pretrain(
             f'Shape of input_ids, masked_input_ids, attention_mask, token_type_ids: {input_ids.shape}, {masked_input_ids.shape}, {attention_mask.shape}, {token_type_ids.shape}'
         )
 
-        with torch.amp.autocast(
-            device_type='cuda', dtype=torch.bfloat16
-        ):  # Uses FP16 if possible.
-            loss, latent_loss = model(
-                input_ids,
-                masked_input_ids,
-                attention_mask,
-                token_type_ids,
-                edge_index,
-                device,
-            )
+        # with torch.amp.autocast(
+        #     device_type='cuda', dtype=torch.bfloat16
+        # ):  # Uses FP16 if possible.
+        loss, latent_loss = model(
+            input_ids,
+            masked_input_ids,
+            attention_mask,
+            token_type_ids,
+            edge_index,
+            device,
+        )
 
         loss.backward()
         optimizer.step()
