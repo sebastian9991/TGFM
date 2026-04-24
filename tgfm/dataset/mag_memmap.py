@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import torch
 from tqdm import tqdm
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizerBase
 
 
 class MAG240MMapTextStore:
@@ -104,7 +104,7 @@ class MAG240MMapTextStore:
                 idx = int(row['idx'])
                 title = row.get('title', '').strip()
                 abstract = row.get('abstract', '').strip()
-                if title == '' or abstract == '':
+                if title == '' and abstract == '':
                     count_misses += 1
 
                 # Format text
@@ -153,7 +153,7 @@ class MAG240MMapTextStore:
             max_seq_len=self.max_seq_len,
         )
 
-        logging.info(f'Found {count_misses} empty titles or abstracts.')
+        logging.info(f'Found {count_misses} empty titles and abstracts.')
         logging.info(f'Created memory-mapped arrays in {self.output_dir}')
 
     def _write_batch(
@@ -283,65 +283,3 @@ class MAG240MMapTextStore:
     def __len__(self) -> int:
         """Return number of nodes."""
         return self.num_nodes
-
-
-# ============= USAGE EXAMPLE =============
-
-if __name__ == '__main__':
-    from transformers import AutoTokenizer
-
-    # Initialize
-    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-
-    text_store = MAG240MMapTextStore(
-        csv_path='data/mag240m_text.csv',
-        output_dir='data/mmap_storage',
-        tokenizer=tokenizer,
-        max_seq_len=512,
-        mask_rate=0.15,
-        force_recreate=False,  # Set True to rebuild from scratch
-    )
-
-    # Get features for a batch of nodes
-    node_ids = torch.tensor([0, 10, 100, 1000])
-
-    # Without masking (for inference/embeddings)
-    features = text_store.get_features(node_ids, apply_masking=False)
-    print(features['input_ids'].shape)  # [4, 512]
-
-    # With masking (for MLM pretraining)
-    features_masked = text_store.get_features(node_ids, apply_masking=True)
-    print(features_masked['masked_input_ids'].shape)  # [4, 512]
-
-    # ============= INTEGRATION WITH PYTORCH GEOMETRIC =============
-    from torch_geometric.data import Data
-    from torch_geometric.loader import NeighborLoader
-
-    # Your graph
-    edge_index = torch.load('data/edge_index.pt')
-    data = Data(edge_index=edge_index, num_nodes=text_store.num_nodes)
-
-    # Neighbor sampler
-    loader = NeighborLoader(
-        data,
-        num_neighbors=[15, 10],
-        batch_size=256,
-        shuffle=True,
-    )
-
-    # Training loop
-    for batch in loader:
-        # Get text features for nodes in this subgraph
-        text_features = text_store.get_features(
-            batch.n_id,
-            apply_masking=True,  # For MLM training
-        )
-
-        # Move to GPU
-        input_ids = text_features['input_ids'].cuda()
-        masked_input_ids = text_features['masked_input_ids'].cuda()
-        attention_mask = text_features['attention_mask'].cuda()
-
-        # Your model forward pass
-        # outputs = model(input_ids, attention_mask, batch.edge_index)
-        # ...
