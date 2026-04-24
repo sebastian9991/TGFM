@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.cuda.amp import autocast
 from torch.utils.data import DataLoader
-from torch_geometric.loader import ClusterLoader, NeighborLoader
+from torch_geometric.loader import NeighborLoader
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
 
@@ -105,8 +105,6 @@ def run_unigraph(
         prefetch_factor=2,
         persistent_workers=True,
     )
-
-    loader = ClusterLoader(cluster_data=dataset, batch_size=1)
 
     model = UniGraph(model_args).to(model_args.device)
 
