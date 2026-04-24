@@ -193,7 +193,7 @@ class UniGraph(nn.Module):
             masked_hidden = combined[mask_positions]  # [N_masked, d]
             masked_logits = self.mlm_head(masked_hidden)  # [N_masked, V]
             masked_labels = input_ids[mask_positions]  # [N_masked]
-            mlm_loss = F.cross_entropy(masked_logits, masked_labels)
+            mlm_loss = F.cross_entropy(masked_logits, masked_labels.long())
         else:
             mlm_loss = combined.sum() * 0.0  # keeps graph connected, zero loss
 
