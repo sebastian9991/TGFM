@@ -164,8 +164,6 @@ class UniGraph(nn.Module):
         edge_index: torch.Tensor,  # [2, E]
         device: torch.device,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        masked_input_ids.size(1)
-
         lm_out = self.lm_encoder(
             input_ids=masked_input_ids,
             attention_mask=attention_mask,
