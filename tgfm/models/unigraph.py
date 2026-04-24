@@ -230,7 +230,8 @@ class UniGraph(nn.Module):
                 ).mean()
             )
 
-            self._update_target_networks(tau=getattr(self.args, 'ema_tau', 0.996))
+            # Removing EMA update here. Training loop calls update_target_networks after optimizer step()
+            # self._update_target_networks(tau=getattr(self.args, 'ema_tau', 0.996))
 
         total_loss = mlm_loss + self.args.lam * latent_loss
         return total_loss, latent_loss
