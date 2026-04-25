@@ -170,7 +170,7 @@ def train_steps(
 
         loss.backward()
         optimizer.step()
-        model.module.update_target_networks()
+        model.module._update_target_networks()
 
         # Update local EMA loss (cheap, no sync needed)
         loss_val = loss.detach().item()
