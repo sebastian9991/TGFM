@@ -150,8 +150,6 @@ def train_steps(
         batch = next(data_iter)
         optimizer.zero_grad(set_to_none=True)
 
-        logging.info(f'batch size: {batch.batch_size}')
-        logging.info(f'batch # nid: {len(batch.n_id)}')
         text_features = text_store.get_features(batch.n_id, apply_masking=True)
         input_ids = text_features['input_ids'].to(device, non_blocking=True)
         masked_input_ids = text_features['masked_input_ids'].to(
