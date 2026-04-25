@@ -39,9 +39,10 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-from text_store import write_text_store
 from torch_geometric.data import Data
 from transformers import AutoTokenizer
+
+from tgfm.dataset.evaluation.text_store import write_text_store
 
 parser = argparse.ArgumentParser(
     description='Prepare cora dataset.',
@@ -139,6 +140,7 @@ def parse_cora_cites(path: Path, id_to_idx: Dict[str, int]) -> torch.Tensor:
         logging.warning(f'Skipped {skipped} citation lines (malformed or unknown ids)')
 
     # Undirected: include both (u, v) and (v, u)
+    # TODO: Take note of this. Perhaps remove it, we only really need one direction.
     edge_index = torch.tensor(
         [src_list + dst_list, dst_list + src_list], dtype=torch.long
     )
