@@ -43,6 +43,7 @@ from torch_geometric.data import Data
 from transformers import AutoTokenizer
 
 from tgfm.dataset.evaluation.text_store import write_text_store
+from tgfm.utils.logger import setup_logging
 
 parser = argparse.ArgumentParser(
     description='Prepare cora dataset.',
@@ -337,6 +338,7 @@ def make_cora_splits(
 def main() -> None:
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    setup_logging(args.log_file)
 
     content_path = args.raw_dir / 'cora.content'
     cites_path = args.raw_dir / 'cora.cites'
