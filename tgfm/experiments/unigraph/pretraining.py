@@ -10,7 +10,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Generator, Optional, Tuple
+from typing import Iterator, Optional, Tuple
 
 import torch
 import torch.distributed as dist
@@ -56,7 +56,7 @@ def cleanup_distributed() -> None:
         dist.destroy_process_group()
 
 
-def infinite_loader(loader: NeighborLoader) -> Generator[Data]:
+def infinite_loader(loader: NeighborLoader) -> Iterator[Data]:
     """Yield batches forever. When the loader exhausts, start a new pass."""
     while True:
         for batch in loader:
