@@ -8,12 +8,15 @@ Launch with:
 import argparse
 import logging
 import os
+import random
 import time
 from pathlib import Path
 from typing import Iterator, Optional, Tuple
 
+import numpy as np
 import torch
 import torch.distributed as dist
+import wandb
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
@@ -38,6 +41,10 @@ parser.add_argument(
 
 
 def setup_distributed() -> Tuple[int, int, int, torch.device]:
+    """Set up distributed backend, get ranks, world size."""
+    assert torch.cuda.is_available() and torch.cuda.device_count() > 0
+    assert torch.distributed.is_available()
+
     if 'LOCAL_RANK' not in os.environ:
         raise RuntimeError('Launch with torchrun (sets LOCAL_RANK).')
 
@@ -86,6 +93,14 @@ def save_checkpoint(
             'ema_loss': ema_loss,
             'best_ema_loss': best_ema_loss,
             'world_size': world_size,
+            'rng_states': {
+                'torch': torch.get_rng_state(),
+                'cuda': torch.cuda.get_rng_state(),
+                'numpy': np.random.get_state(),
+                'python': random.getstate(),
+                'torch_cpu': torch.random.get_rng_state(),
+                'torch_gpu': torch.cuda.get_rng_state_all(),
+            },
         },
         tmp_path,
     )
@@ -99,9 +114,15 @@ def load_checkpoint(
     device: torch.device,
 ) -> dict:
     """Load a checkpoint. Returns metadata dict. Called on all ranks."""
+    # TODO: Look at how load_checkpoint is implemented in the mila docs. In the multi-node/multi-gpu example.
     ckpt = torch.load(path, map_location=device)
     model.module.load_state_dict(ckpt['model_state_dict'])
     optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+    if 'rng_states' in ckpt:
+        torch.set_rng_state(ckpt['rng_states']['torch'])
+        torch.cuda.set_rng_state(ckpt['rng_states']['cuda'])
+        np.random.set_state(ckpt['rng_states']['numpy'])
+        random.setstate(ckpt['rng_states']['python'])
     return {
         'step': ckpt['step'],
         'ema_loss': ckpt['ema_loss'],
@@ -126,6 +147,7 @@ def train_steps(
     max_wall_seconds: Optional[float],
     start_step: int = 0,
     best_ema_loss_init: float = float('inf'),
+    verbose: bool = False,
 ) -> None:
     """Run step-based training with best-checkpoint tracking."""
     model.train()
@@ -224,6 +246,16 @@ def train_steps(
                 f'rate={rate:.2f}it/s eta={eta_s / 3600:.1f}h'
             )
 
+            if verbose:
+                wandb.log(
+                    {
+                        'train/step': step,
+                        'train/loss': loss_val,
+                        'train/ema_loss_local': ema_loss_local,
+                        'train/ema_loss_global': ema_loss_global,
+                    }
+                )
+
         # Periodic "latest" checkpoint for resumption
         if global_rank == 0 and (step + 1) % save_every_steps == 0:
             save_checkpoint(
@@ -280,6 +312,8 @@ def train_steps(
             f'Training complete at step {step + 1}. '
             f'Final ema_loss={ema_loss_global:.4f}, best_ema_loss={best_ema_loss:.4f}'
         )
+        if verbose:
+            wandb.finish()
 
 
 def run_unigraph(
@@ -292,6 +326,7 @@ def run_unigraph(
     world_size: int,
     device: torch.device,
     full_coverage: bool = False,
+    verbose: bool = False,
 ) -> None:
     assert isinstance(model_args, UnigraphArguments)
     data = dataset[0]
@@ -300,6 +335,9 @@ def run_unigraph(
         save_dir.mkdir(parents=True, exist_ok=True)
         logging.info(f'Graph: {data.num_nodes} nodes, {data.num_edges} edges')
         logging.info(f'World size: {world_size}')
+        logging.info(
+            f'Effective (global) batch size: {model_args.batch_size * world_size}'
+        )
 
     # Shard seed nodes across ranks
     all_nodes = torch.arange(data.num_nodes)
@@ -337,6 +375,9 @@ def run_unigraph(
     if latest_path.exists():
         if global_rank == 0:
             logging.info(f'Resuming from {latest_path}')
+            logging.info(
+                f'NOTE: data iterator restarts from the beginning of the shuffle order. A certain amount of early seed nodes may be revisted.'
+            )
         meta = load_checkpoint(latest_path, model, optimizer, device)
         start_step = meta['step']
         best_ema_loss_init = meta['best_ema_loss']
@@ -366,6 +407,17 @@ def run_unigraph(
             f'ema_alpha={ema_alpha}, '
             f'max_wall_seconds={max_wall_seconds}'
         )
+        if verbose:
+            wandb.config.update(
+                {
+                    'lr': model_args.lr,
+                    'batch_size': model_args.batch_size,
+                    'num_neighbors': model_args.num_neighbors,
+                    'max_steps': max_steps,
+                    'reduce_every_steps': reduce_every_steps,
+                    'ema_alpha': ema_alpha,
+                }
+            )
 
     train_steps(
         model=model,
@@ -384,6 +436,7 @@ def run_unigraph(
         max_wall_seconds=max_wall_seconds,
         start_step=start_step,
         best_ema_loss_init=best_ema_loss_init,
+        verbose=verbose,
     )
 
 
@@ -395,6 +448,18 @@ def main() -> None:
         args = parser.parse_args()
         config_file_path = root / args.config_file
         meta_args, experiment_args = parse_args(config_file_path)
+        if meta_args.verbose and global_rank == 0:
+            mode = 'online' if getattr(meta_args, 'wandb_online', True) else 'offline'
+            wandb.init(
+                project=getattr(meta_args, 'wandb_project', 'unigraph-pretrain'),
+                name=getattr(meta_args, 'wandb_run_name', None),
+                config={
+                    'world_size': world_size,
+                    'global_seed': meta_args.global_seed,
+                },
+                mode=mode,
+            )
+            time.sleep(5)  # Helpful for a pottential 409 error on wandb servers.
 
         seed_everything(meta_args.global_seed + global_rank)
 
@@ -413,6 +478,9 @@ def main() -> None:
 
         if global_rank == 0:
             logging.info('Dataset, tokenizer, and text store loaded.')
+            logging.info(
+                f'World size: {world_size}, global rank: {global_rank}, "local_rank: {local_rank}'
+            )
 
         for experiment, experiment_arg in experiment_args.exp_args.items():
             if global_rank == 0:
@@ -426,6 +494,7 @@ def main() -> None:
                 global_rank=global_rank,
                 world_size=world_size,
                 device=device,
+                verbose=meta_args.verbose,
             )
     finally:
         cleanup_distributed()
