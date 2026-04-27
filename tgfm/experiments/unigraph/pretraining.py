@@ -449,7 +449,7 @@ def main() -> None:
         config_file_path = root / args.config_file
         meta_args, experiment_args = parse_args(config_file_path)
         if meta_args.verbose and global_rank == 0:
-            mode = 'online' if getattr(meta_args, 'wandb_online', True) else 'offline'
+            mode = 'offline' if getattr(meta_args, 'wandb_offline', True) else 'online'
             wandb.init(
                 project=getattr(meta_args, 'wandb_project', 'unigraph-pretrain'),
                 name=getattr(meta_args, 'wandb_run_name', None),
