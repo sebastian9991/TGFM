@@ -37,7 +37,7 @@ class UniGraph(nn.Module):
 
         # Shared language model (used for BOTH online and target paths).
         self.lm_encoder = AutoModel.from_pretrained(
-            args.lm_type, attn_implementation='flash_attention_2'
+            args.lm_type
         )  # TODO: Use floating point 16? Not sure how much mem saved.
         if getattr(args, 'gradient_checkpointing', False):
             self.lm_encoder.gradient_checkpointing_enable()
