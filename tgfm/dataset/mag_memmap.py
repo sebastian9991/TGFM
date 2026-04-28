@@ -291,7 +291,7 @@ class MAG240MMapTextStore:
         random_idx_in_allowed = torch.randint(
             0,
             len(allowed_ids),
-            random_token_indices.sum().item(),
+            (random_token_indices.sum().item(),),
             device=input_ids.device,
         )
 
