@@ -4,6 +4,8 @@ scripts/throwaway/
 data/test_data/nemo_curator/data/curated/*
 data/evaluation_data/raw/*
 fast_text/
+logs/
+plots/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
