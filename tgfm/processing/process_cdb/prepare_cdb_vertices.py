@@ -58,6 +58,7 @@ def discover_month_dirs(input_root: Path) -> List[Path]:
 
 
 def main() -> None:
+    logging.info(f'Preparing CDB vertices.')
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
     months = discover_month_dirs(args.input_root)
