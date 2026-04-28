@@ -104,7 +104,7 @@ def main() -> None:
                 pl.col('n_months').cast(pl.Int8),
             ]
         )
-        .collect(engine=True)  # streaming = doesn't require all data in RAM
+        .collect(streaming=True)  # streaming = doesn't require all data in RAM
     )
 
     n_unique = len(registry)
