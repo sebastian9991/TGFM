@@ -63,6 +63,7 @@ parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--log-file', type=str, default='prepare_cora.log')
 
 
+# TODO: How did they get this??
 CORA_LABEL_NAMES = [
     'Case_Based',
     'Genetic_Algorithms',
@@ -305,6 +306,7 @@ def collect_texts(
 # ----------------------------------------------------------------------------
 # Splits (UniGraph paper Appendix B)
 # ----------------------------------------------------------------------------
+# TODO: Check why train < test, val
 def make_cora_splits(
     y: torch.Tensor,
     num_nodes: int,
@@ -312,6 +314,12 @@ def make_cora_splits(
     train_per_class: int = 20,
     val_per_class: int = 30,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Unigraph paper describes: For Cora and PubMed, we follow commonly used
+    data splits, using 20 labeled nodes per class as the training set,
+    30 nodes per class as the validation set, and the rest as the test
+    set. We report the average accuracy on test set with 20 random
+    initialization.
+    """
     rng = np.random.default_rng(seed)
     train_mask = torch.zeros(num_nodes, dtype=torch.bool)
     val_mask = torch.zeros(num_nodes, dtype=torch.bool)
