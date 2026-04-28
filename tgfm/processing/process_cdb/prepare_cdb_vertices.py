@@ -69,6 +69,7 @@ def main() -> None:
     per_month_counts = {}
     for month_dir in months:
         path = month_dir / 'vertices.csv'
+        logging.info(f'Processing: {path}')
         # Count rows in pre-pass — useful for the overlap statistic later.
         # collect_schema is metadata-only; for row count we need to scan.
         n = pl.scan_csv(path).select(pl.len()).collect().item()
@@ -103,7 +104,7 @@ def main() -> None:
                 pl.col('n_months').cast(pl.Int8),
             ]
         )
-        .collect(streaming=True)  # streaming = doesn't require all data in RAM
+        .collect(engine=True)  # streaming = doesn't require all data in RAM
     )
 
     n_unique = len(registry)
