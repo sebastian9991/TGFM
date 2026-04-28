@@ -42,6 +42,7 @@ import torch
 from transformers import AutoTokenizer
 
 from tgfm.dataset.cdb_text_store import open_writable_store
+from tgfm.utils.logger import setup_logging
 
 parser = argparse.ArgumentParser(
     description='Prepare CDB text store.',
@@ -116,7 +117,7 @@ def discover_month_dirs(input_root: Path) -> List[Path]:
 
 def main() -> None:
     args = parser.parse_args()
-
+    setup_logging(args.log_file)
     logging.info(f'Loading registry from {args.registry}')
     registry_df = pl.read_parquet(args.registry, columns=['node_id', 'domain'])
     num_nodes = len(registry_df)
