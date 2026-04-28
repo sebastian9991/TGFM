@@ -32,6 +32,8 @@ from typing import List
 
 import polars as pl
 
+from tgfm.utils.logger import setup_logging
+
 parser = argparse.ArgumentParser(
     description='Prepare CDB vertices.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -61,6 +63,8 @@ def main() -> None:
     logging.info(f'Preparing CDB vertices.')
     args = parser.parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
+    setup_logging(args.log_file)
+
     months = discover_month_dirs(args.input_root)
     logging.info(f'Found {len(months)} months: {[m.name for m in months]}')
 
