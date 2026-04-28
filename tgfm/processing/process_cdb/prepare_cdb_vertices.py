@@ -93,7 +93,7 @@ def main() -> None:
     combined = pl.concat(lazy_frames)
 
     # ---- Aggregate per-domain stats and assign node_ids ----
-    logging.info('Aggregating per-domain stats (this is the slow step)...')
+    logging.info('Aggregating per-domain stats...')
     registry = (
         combined.group_by('domain')
         .agg(
