@@ -2,6 +2,7 @@
 
 scripts/throwaway/
 data/test_data/nemo_curator/data/curated/*
+data/evluation_data/*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
