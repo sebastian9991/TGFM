@@ -60,7 +60,7 @@ parser.add_argument(
     help='Tokenizer batch size affects throughput, not output.',
 )
 parser.add_argument('--text-column', default='wet_record_txt')
-parser.add_argument('--domain-column', default='domain')
+parser.add_argument('--domain-column', default='Domain_Name')
 parser.add_argument('--log-file', type=str, default='prepare_text_store.log')
 
 
