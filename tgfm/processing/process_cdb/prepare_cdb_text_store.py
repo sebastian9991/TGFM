@@ -39,6 +39,7 @@ from typing import Any, Dict, List
 import numpy as np
 import polars as pl
 import torch
+from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from tgfm.dataset.cdb_text_store import open_writable_store
@@ -167,7 +168,7 @@ def main() -> None:
         'intra_month_duplicates': 0,
     }
 
-    for month_dir in month_dirs:
+    for month_dir in tqdm(month_dirs, desc='Iterating months'):
         month_name = month_dir.parent.name
         logging.info(f'=== {month_name} ===')
         parquet_files = sorted(month_dir.glob('*.parquet'))
@@ -182,7 +183,7 @@ def main() -> None:
             'intra_month_duplicates': 0,
         }
 
-        for shard_path in parquet_files:
+        for shard_path in tqdm(parquet_files, desc='Iterating shards'):
             df = pl.read_parquet(
                 shard_path,
                 columns=[args.domain_column, args.text_column],
@@ -216,7 +217,9 @@ def main() -> None:
                 batch_texts.append(t if t is not None else '')
 
             # Tokenize in chunks for memory safety
-            for i in range(0, len(batch_texts), args.batch_size):
+            for i in tqdm(
+                range(0, len(batch_texts), args.batch_size), desc='Writing chunks'
+            ):
                 chunk_ids = batch_node_ids[i : i + args.batch_size]
                 chunk_texts = batch_texts[i : i + args.batch_size]
 
