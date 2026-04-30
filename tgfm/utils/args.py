@@ -36,6 +36,10 @@ class MetaArguments:
         default=False,
         metadata={'help': 'Whether to use the /NOBACKUP/ or /SCRATCH/ disk on server.'},
     )
+    verbose: bool = field(
+        default=False,
+        metadata={'help': 'Whether to track metrics with wandb.'},
+    )
 
     def __post_init__(self) -> None:
         """Resolve all file and directory paths relative to the selected root directory."""
@@ -110,6 +114,7 @@ class UnigraphArguments(ModelArguments):
     nhead: int = field(default=8)
     activation: str = field(default='gelu')
     norm: str = field(default='layernorm')
+    gradient_checkpointing: bool = field(default=False)
     negative_slope: float = field(default=0.2)
     batch_size: int = field(default=32)
     mask_rate: float = field(default=0.15)
