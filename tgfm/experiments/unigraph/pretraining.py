@@ -487,8 +487,6 @@ def main() -> None:
             logging.info(
                 f'World size: {world_size}, global rank: {global_rank}, "local_rank: {local_rank}'
             )
-        else:
-            raise ValueError(f'Expecting global rank: {global_rank} == 0.')
 
         for experiment, experiment_arg in experiment_args.exp_args.items():
             if global_rank == 0:
