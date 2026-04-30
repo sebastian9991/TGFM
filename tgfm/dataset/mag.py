@@ -37,7 +37,9 @@ class MAG240MGraphDataset(InMemoryDataset):
         super().__init__(root, transform, pre_transform, pre_filter)
 
         # Load the processed data into memory
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(
+            self.processed_paths[0], map_location='cpu', weights_only=False
+        )
 
     @property
     def mag_dataset(self) -> MAG240MDataset:
@@ -95,10 +97,9 @@ class MAG240MGraphDataset(InMemoryDataset):
             num_nodes=num_nodes,
         )
 
-        data_list = [data] if data is not None else []
-
         logging.info(f'Saving processed data to {self.processed_paths[0]}...')
-        self.save(data_list, self.processed_paths[0])
+        # self.save(self.collate([data]), self.processed_paths[0])
+        torch.save(self.collate([data]), self.processed_paths[0])
         logging.info('Processing complete.')
 
     def get_node_text(self, node_id: int) -> str:

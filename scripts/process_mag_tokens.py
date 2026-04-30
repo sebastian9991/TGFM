@@ -21,13 +21,13 @@ parser.add_argument(
 if __name__ == '__main__':
     args = parser.parse_args()
     setup_logging('process_mag_mmap.log')
-    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+    tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased', use_fast=True)
 
     text_store = MAG240MMapTextStore(
         csv_path=args.text_csv_path,
         output_dir=args.output_memmap_path,
         tokenizer=tokenizer,
-        max_seq_len=512,
+        max_seq_len=128,
         mask_rate=0.15,
         force_recreate=False,  # Set True to rebuild from scratch
     )
