@@ -16,7 +16,7 @@ pip install uv
 
 ### Installation
 
-```sh
+````sh
 # Clone the repo
 git clone git@github.com:sebastian9991/TGFM.git
 
@@ -41,12 +41,8 @@ own venv. seperate from `uv sync`.
 
 PyTorch Sparse, Scatter and pyg-lib:
 
-```
-
+```sh
 uv pip install pyg-lib torch-scatter torch-sparse -f https://data.pyg.org/whl/torch-2.11.0+cu128.html
-
-```
+````
 
 For information on installations of these additional libraries see [pyg-lib](https://github.com/pyg-team/pyg-lib) and [PyTorch Sparse](https://github.com/rusty1s/pytorch_sparse).
-
-```
