@@ -46,9 +46,38 @@ For more information on installations of these additional libraries see [pyg-lib
 
 ## Usage
 
+All experiment scripts will include an argument which points to a configuration file which defines experimental, data and model arguments. As well as Meta arguments for constant values across hyperparameters or models. Here is an example:
+
+```sh
+MetaArguments:
+  log_file_path: "unigraph_ogb_pretraining.log"
+  root_dir: "ogb_100m/"
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    Unigraph:
+      model_args:
+        model: "Unigraph"
+        num_layers: 3
+        num_neighbors: [4, 2, 1]
+        batch_size: 16
+        dropout: 0.2
+        lr: 2.0e-5
+        weight_decay: 0.001
+        device: 0
+      data_args:
+        task_name: "pre-training"
+```
+
+For more information on the arguments check: [args.py](tgfm/utils/args.py)
+
 ### Pre-Training
 
-Due to the scale of the graph datasets and text attributes that come with them we recommend pre-training this in a distributed setup. Here is an example launch script:
+Due to the scale of the graph datasets and text attributes that come with them we recommend pre-training this in a distributed setup, with multiple nodes and GPUs. Here is an example launch script:
+
+#### Unigraph
 
 ```sh
 #!/bin/bash
@@ -83,5 +112,14 @@ srun --gres-flags=allow-task-sharing bash -c "
         --config-file configs/unigraph/base.yaml
     "
 ```
+
+You will need to accomadate the subgraph size depending on the defined max sequence length in your text store, in order for the batches to fit in GPU memory. Subgraph
+sizes are calculated based on the `batch_size` and `num_neighbor` model argument paramaters. Your actual subgraph batch size will be at most:
+
+$$|n_id|_{\\max} = B \\cdot \\left(1 + \\sum_{\\ell=1}^{L} \\prod\_{i=1}^{\\ell} k_i\\right)$$
+
+Where $$B$$ is your batch size, and $$k_i$$ is the ith neighbor in `num_neighbor`.
+
+If you are willing to trade-off efficiency for lighter memory loads on the GPU, then consider enabling gradient checkpointing:
 
 ### Evaluation
