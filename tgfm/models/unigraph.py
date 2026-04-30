@@ -36,7 +36,9 @@ class UniGraph(nn.Module):
         self.args = args
 
         # Shared language model (used for BOTH online and target paths).
-        self.lm_encoder = AutoModel.from_pretrained(args.lm_type)
+        self.lm_encoder = AutoModel.from_pretrained(
+            args.lm_type
+        )  # TODO: Use floating point 16? Not sure how much mem saved.
         if getattr(args, 'gradient_checkpointing', False):
             self.lm_encoder.gradient_checkpointing_enable()
 
@@ -249,14 +251,12 @@ class UniGraph(nn.Module):
         self,
         input_ids: torch.Tensor,
         attention_mask: torch.Tensor,
-        token_type_ids: torch.Tensor,
         edge_index: torch.Tensor,
-        device: torch.device,
     ) -> torch.Tensor:
         lm_out = self.lm_encoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
+            token_type_ids=None,
         )
         lm_hidden = lm_out.last_hidden_state
         node_features = lm_hidden[:, 0, :]

@@ -36,6 +36,10 @@ class MetaArguments:
         default=False,
         metadata={'help': 'Whether to use the /NOBACKUP/ or /SCRATCH/ disk on server.'},
     )
+    verbose: bool = field(
+        default=False,
+        metadata={'help': 'Whether to track metrics with wandb.'},
+    )
 
     def __post_init__(self) -> None:
         """Resolve all file and directory paths relative to the selected root directory."""

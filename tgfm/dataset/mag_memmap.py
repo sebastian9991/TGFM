@@ -30,6 +30,12 @@ class MAG240MMapTextStore:
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
         self.mask_rate = mask_rate
+        # Make sure random doesn't use special ID:
+        special_ids = set(self.tokenizer.all_special_ids)
+        self.allowed_ids = torch.tensor(
+            [i for i in range(len(self.tokenizer)) if i not in special_ids],
+            dtype=torch.long,
+        )
 
         # Define paths for each component
         self.paths = {
@@ -256,7 +262,7 @@ class MAG240MMapTextStore:
         return result
 
     def _create_masked_version(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Create masked version for MLM training.
+        """Create masked version for MLM training. We use the BERT masking strategy.
 
         Args:
             input_ids: Original input IDs [batch_size, seq_len]
@@ -267,16 +273,31 @@ class MAG240MMapTextStore:
         masked_input_ids = input_ids.clone()
 
         # Create mask: random tokens, excluding special tokens
-        mask_indices = torch.rand(input_ids.shape) < self.mask_rate
+        prob_matrix = torch.rand(input_ids.shape)
         mask_indices = (
-            mask_indices
+            (prob_matrix < self.mask_rate)
             & (input_ids != self.tokenizer.cls_token_id)
             & (input_ids != self.tokenizer.sep_token_id)
             & (input_ids != self.tokenizer.pad_token_id)
         )
 
+        # 80% -> [MASK], 10% -> random, 10% -> original
+        mask_token_indices = mask_indices & (torch.rand(input_ids.shape) < 0.8)
+        random_token_indices = (
+            mask_indices & ~mask_token_indices & (torch.rand(input_ids.shape) < 0.5)
+        )
+
+        allowed_ids = self.allowed_ids.to(input_ids.device)
+        random_idx_in_allowed = torch.randint(
+            0,
+            len(allowed_ids),
+            (random_token_indices.sum().item(),),
+            device=input_ids.device,
+        )
+
         # Apply masking
-        masked_input_ids[mask_indices] = self.tokenizer.mask_token_id
+        masked_input_ids[mask_token_indices] = self.tokenizer.mask_token_id
+        masked_input_ids[random_token_indices] = allowed_ids[random_idx_in_allowed]
 
         return masked_input_ids
 
