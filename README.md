@@ -135,7 +135,7 @@ ExperimentArguments:
 
 ### Evaluation
 
-We use a variety of popular text-attributed graph datasets for OOD experimentation. To prepare these datasets for evaluation we have included scripts to do so under the \[evaluation data folder\] (data/evaluation_data).
+We use a variety of popular text-attributed graph datasets for OOD experimentation. To prepare these datasets for evaluation we have included scripts to do so under the [evaluation data folder](data/evaluation_data).
 
 For example with Cora:
 
