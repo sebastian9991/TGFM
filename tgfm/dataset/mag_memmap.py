@@ -273,7 +273,7 @@ class MAG240MMapTextStore:
         masked_input_ids = input_ids.clone()
 
         # Create mask: random tokens, excluding special tokens
-        prob_matrix = torch.rand(input_ids.shape)
+        prob_matrix = torch.rand(input_ids.shape, device=input_ids.device)
         mask_indices = (
             (prob_matrix < self.mask_rate)
             & (input_ids != self.tokenizer.cls_token_id)
@@ -287,7 +287,7 @@ class MAG240MMapTextStore:
             mask_indices & ~mask_token_indices & (torch.rand(input_ids.shape) < 0.5)
         )
 
-        allowed_ids = self.allowed_ids.to(input_ids.device)
+        allowed_ids = self.allowed_ids.to(input_ids.device, dtype=input_ids.dtype)
         random_idx_in_allowed = torch.randint(
             0,
             len(allowed_ids),

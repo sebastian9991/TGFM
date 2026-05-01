@@ -17,6 +17,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 import wandb
+from torch.distributed.elastic.multiprocessing.errors import record
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
@@ -353,6 +354,8 @@ def run_unigraph(
         prefetch_factor=2,
         persistent_workers=True,
     )
+    if global_rank == 0:
+        logging.info(f'Pre-train loader loaded.')
 
     model = UniGraph(model_args).to(device)
     model = DDP(
@@ -362,6 +365,8 @@ def run_unigraph(
         find_unused_parameters=False,
         gradient_as_bucket_view=True,
     )
+    if global_rank == 0:
+        logging.info(f'Model loaded.')
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -440,6 +445,7 @@ def run_unigraph(
     )
 
 
+@record
 def main() -> None:
     local_rank, global_rank, world_size, device = setup_distributed()
 
