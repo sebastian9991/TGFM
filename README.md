@@ -113,8 +113,9 @@ srun --gres-flags=allow-task-sharing bash -c "
     "
 ```
 
-You will need to accommodate the subgraph size depending on the defined max sequence length in your text store, in order for the batches to fit in GPU memory. Subgraph
-sizes are calculated based on the `batch_size` and `num_neighbor` model argument paramaters. Your actual subgraph batch size will be at most:
+You will need to accommodate the subgraph size depending on the defined max sequence length in your text storein order for the batches to fit in GPU memory.
+
+Subgraph sizes are calculated based on the `batch_size` and `num_neighbor` model argument paramaters. Your actual subgraph batch size will be at most:
 
 $$|n_id|_{\\max} = B \\cdot \\left(1 + \\sum_{\\ell=1}^{L} \\prod\_{i=1}^{\\ell} k_i\\right)$$
 
