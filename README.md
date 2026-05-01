@@ -46,7 +46,7 @@ For more information on installations of these additional libraries see [pyg-lib
 
 ## Usage
 
-All experiment scripts will include an argument which points to a configuration file which defines experimental, data and model arguments. As well as Meta arguments for constant values across hyperparameters or models. Here is an example:
+All experiment scripts will include an argument which points to a configuration file defining experimental, data and model arguments. As well as Meta arguments for constant values paths, seeds, etc. Here is an example:
 
 ```sh
 MetaArguments:
@@ -135,12 +135,28 @@ ExperimentArguments:
 
 ### Evaluation
 
-### Pre-Processing
+We use a variety of popular text-attributed graph datasets for OOD experimentation. To prepare these datasets for evaluation we have included scripts to do so under the \[evaluation data folder\] (data/evaluation_data).
 
-Considering the size of these graph datasets and the added text-attributes, we utilize a memmory mapped text store, which allows us to load the text in batches when needed. We've made available scripts process the OGB MAG240M into the format required. NOTE: You will need to download the text from [OGB](https://ogb.stanford.edu/docs/lsc/mag240m/)
+For example with Cora:
 
 ```sh
+uv run data/evaluation_data/cora/prepare_cora.py --output-dir path/to/output
+```
+
+After preparing each evaluation dataset
+
+```sh
+uv run tgfm/evaluation/evaluate_tags.py --config-file path/to/pretrain/config --text-store-dir path/to/evaluation/dataset
+```
+
+### Pre-Processing
+
+Considering the size of these graph datasets and the added text-attributes, we utilize a memmory mapped text store, which allows us to load the text in memory only when needed. We've made available scripts process the OGB MAG240M into the format required. NOTE: You will need to download the text from [OGB](https://ogb.stanford.edu/docs/lsc/mag240m/)
+
+```sh
+#Get the graph data
 uv run scripts/process_mag_dataset.py --root path/to/save/mag/graph/data
 
+#Build the text-store
 uv run scripts/process_mag_tokens.py --text-csv-path path/to/text/ --output-memmap-path path/to/resulting/memmap
 ```
