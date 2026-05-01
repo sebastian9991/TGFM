@@ -113,7 +113,7 @@ srun --gres-flags=allow-task-sharing bash -c "
     "
 ```
 
-You will need to accomadate the subgraph size depending on the defined max sequence length in your text store, in order for the batches to fit in GPU memory. Subgraph
+You will need to accommodate the subgraph size depending on the defined max sequence length in your text store, in order for the batches to fit in GPU memory. Subgraph
 sizes are calculated based on the `batch_size` and `num_neighbor` model argument paramaters. Your actual subgraph batch size will be at most:
 
 $$|n_id|_{\\max} = B \\cdot \\left(1 + \\sum_{\\ell=1}^{L} \\prod\_{i=1}^{\\ell} k_i\\right)$$
@@ -122,4 +122,25 @@ Where $$B$$ is your batch size, and $$k_i$$ is the ith neighbor in `num_neighbor
 
 If you are willing to trade-off efficiency for lighter memory loads on the GPU, then consider enabling gradient checkpointing:
 
+```sh
+ExperimentArguments:
+  exp_args:
+    Unigraph:
+      model_args:
+        model: "Unigraph"
+        gradient_checkpointing: true
+      data_args:
+        task_name: "pre-training"
+```
+
 ### Evaluation
+
+### Pre-Processing
+
+Considering the size of these graph datasets and the added text-attributes, we utilize a memmory mapped text store, which allows us to load the text in batches when needed. We've made available scripts process the OGB MAG240M into the format required. NOTE: You will need to download the text from [OGB](https://ogb.stanford.edu/docs/lsc/mag240m/)
+
+```sh
+uv run scripts/process_mag_dataset.py --root path/to/save/mag/graph/data
+
+uv run scripts/process_mag_tokens.py --text-csv-path path/to/text/ --output-memmap-path path/to/resulting/memmap
+```
