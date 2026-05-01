@@ -152,9 +152,11 @@ uv run tgfm/evaluation/evaluate_tags.py --config-file path/to/pretrain/config --
 
 ### Pre-Processing
 
+Considering the size of these graph datasets and the added text-attributes, we utilize a memmory mapped text store, which allows us to load the text in memory only when needed. We've made available scripts process the OGB MAG240M into the format required.
+
 #### OGB MAG240M
 
-Considering the size of these graph datasets and the added text-attributes, we utilize a memmory mapped text store, which allows us to load the text in memory only when needed. We've made available scripts process the OGB MAG240M into the format required. NOTE: You will need to download the text from [OGB](https://ogb.stanford.edu/docs/lsc/mag240m/)
+NOTE: You will need to download the text from [OGB](https://ogb.stanford.edu/docs/lsc/mag240m/)
 
 ```sh
 #Get the graph data
