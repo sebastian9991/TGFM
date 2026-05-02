@@ -62,7 +62,9 @@ class MetaArguments:
         self.root_dir = resolve_paths(self.root_dir)
 
         if self.log_file_path is not None:
-            self.log_file_path = str(get_root_dir() / 'logs' / self.log_file_path)
+            log_dir = get_root_dir() / 'logs'
+            log_dir.mkdir(parents=True, exist_ok=True)
+            self.log_file_path = str(log_dir / self.log_file_path)
 
 
 @dataclass
