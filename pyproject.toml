@@ -12,6 +12,7 @@ dependencies = [
     "torch-geometric>=2.7.0",
     "tqdm>=4.67.3",
     "transformers>=5.4.0",
+    "wandb>=0.26.1",
 ]
 
 [dependency-groups]
@@ -25,7 +26,6 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.1.0",
     "seaborn>=0.13.2",
-    "wandb>=0.26.1",
 ]
 
 [tool.flit.module]
