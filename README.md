@@ -79,8 +79,6 @@ Due to the scale of the graph datasets and text attributes that come with them w
 
 #### Unigraph
 
-### Model
-
 ![unigraph_model](img/Unigraph.png)
 
 ```sh
