@@ -79,6 +79,10 @@ Due to the scale of the graph datasets and text attributes that come with them w
 
 #### Unigraph
 
+### Model
+
+![unigraph_model](img/Unigraph.png)
+
 ```sh
 #!/bin/bash
 #SBATCH --nodes=x
@@ -90,6 +94,7 @@ set -e
 echo "Date:     $(date)"
 echo "Job ID:   $SLURM_JOB_ID"
 echo "Nodes:    $SLURM_JOB_NODELIST"
+
 
 echo "Attempt: #${SLURM_RESTART_COUNT:-0}"
 
