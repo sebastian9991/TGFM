@@ -193,11 +193,10 @@ uv run --active tgfm/processing/language_extraction/main.py --file-paths $SCRATC
 
 After which you can construct the text-store object and PyG Dataset:
 
-\`\`sh
+```sh
 uv run tgfm/processing/process_cdb/prepare_cdb_vertices.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed
 
 uv run tgfm/processing/process_cdb/prepare_cdb_edges.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed --registry $SCRATCH/path/to/processed/domain_registry.parquet
 
 uv run tgfm/processing/process_cdb/prepare_cdb_text_store.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed --registry $SCRATCH/path/to/processed/domain_registry.parquet --tokenizer xlm-roberta-base --seq-len 512
-
-\`\`
+```
