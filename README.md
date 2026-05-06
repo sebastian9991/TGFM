@@ -120,7 +120,7 @@ srun --gres-flags=allow-task-sharing bash -c "
 
 ### Memory Recommendations
 
-You will need to accommodate the subgraph size depending on the defined max sequence length in your text storein order for the batches to fit in GPU memory.
+You will need to accommodate the subgraph size depending on the defined max sequence length in your text store in order for the batches to fit in GPU memory.
 
 Subgraph sizes are calculated based on the `batch_size` and `num_neighbor` model argument paramaters. Your actual subgraph batch size will be at most:
 
@@ -136,7 +136,7 @@ ExperimentArguments:
     Unigraph:
       model_args:
         model: ""
-        gradient_checkpointing: true
+        gradient_checkpointing: true #Enable gradient checkpointing
       data_args:
         task_name: "pre-training"
 ```
