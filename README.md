@@ -79,6 +79,8 @@ Due to the scale of the graph datasets and text attributes that come with them w
 
 #### Unigraph
 
+![unigraph_model](img/Unigraph.png)
+
 ```sh
 #!/bin/bash
 #SBATCH --nodes=x
@@ -90,6 +92,7 @@ set -e
 echo "Date:     $(date)"
 echo "Job ID:   $SLURM_JOB_ID"
 echo "Nodes:    $SLURM_JOB_NODELIST"
+
 
 echo "Attempt: #${SLURM_RESTART_COUNT:-0}"
 
@@ -113,7 +116,9 @@ srun --gres-flags=allow-task-sharing bash -c "
     "
 ```
 
-You will need to accommodate the subgraph size depending on the defined max sequence length in your text storein order for the batches to fit in GPU memory.
+### Memory Recommendations
+
+You will need to accommodate the subgraph size depending on the defined max sequence length in your text store in order for the batches to fit in GPU memory.
 
 Subgraph sizes are calculated based on the `batch_size` and `num_neighbor` model argument paramaters. Your actual subgraph batch size will be at most:
 
@@ -128,8 +133,8 @@ ExperimentArguments:
   exp_args:
     Unigraph:
       model_args:
-        model: "Unigraph"
-        gradient_checkpointing: true
+        model: ""
+        gradient_checkpointing: true #Enable gradient checkpointing
       data_args:
         task_name: "pre-training"
 ```
@@ -164,4 +169,32 @@ uv run scripts/process_mag_dataset.py --root path/to/save/mag/graph/data
 
 #Build the text-store
 uv run scripts/process_mag_tokens.py --text-csv-path path/to/text/ --output-memmap-path path/to/resulting/memmap
+```
+
+#### CrediBench
+
+NOTE: You will need to download the text from [CrediBench-RawText](https://huggingface.co/datasets/credi-net/CrediText/tree/main). Additionally, the vertices and edges from csv files found [here](https://huggingface.co/datasets/credi-net/CrediBench/tree/main)
+
+We process the the parquet files using [nemo-curator](https://github.com/NVIDIA-NeMo/Curator) more information on the data processing can be found [here](https://huggingface.co/datasets/credi-net/CleanCDB).
+
+```sh
+#Text Cleaning
+uv run tgfm/processing/text_cleaning/main.py --file-paths $SCRATCH/data/month/text_data/ --output-path $SCRATCH/data/month/text_data/cleaned_text/ --files-per-partition 1 --num-gpus 1
+
+#Text Deduplication
+uv run --active tgfm/processing/deduplication/main.py --file-paths $SCRATCH/data/month/text_data/cleaned_text/ --output-path $SCRATCH/data/month/text_data/deduplication/ --num-gpus 1
+
+
+#Text Language Labelling
+uv run --active tgfm/processing/language_extraction/main.py --file-paths $SCRATCH/data/month/text_data/deduplication/ --output-path $SCRATCH/data/month/text_data/language_extracted/ --fast-text-path fast_text/ --num-gpus 1
+```
+
+After which you can construct the text-store object and PyG Dataset:
+
+```sh
+uv run tgfm/processing/process_cdb/prepare_cdb_vertices.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed
+
+uv run tgfm/processing/process_cdb/prepare_cdb_edges.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed --registry $SCRATCH/path/to/processed/domain_registry.parquet
+
+uv run tgfm/processing/process_cdb/prepare_cdb_text_store.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed --registry $SCRATCH/path/to/processed/domain_registry.parquet --tokenizer xlm-roberta-base --seq-len 512
 ```
