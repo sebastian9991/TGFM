@@ -116,7 +116,7 @@ def load_checkpoint(
 ) -> dict:
     """Load a checkpoint. Returns metadata dict. Called on all ranks."""
     # TODO: Look at how load_checkpoint is implemented in the mila docs. In the multi-node/multi-gpu example.
-    ckpt = torch.load(path, map_location=device)
+    ckpt = torch.load(path, map_location=device, weights_only=False)
     model.module.load_state_dict(ckpt['model_state_dict'])
     optimizer.load_state_dict(ckpt['optimizer_state_dict'])
     if 'rng_states' in ckpt:
