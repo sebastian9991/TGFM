@@ -85,7 +85,7 @@ def discover_month_dirs(input_root: Path) -> List[Path]:
     """Find <input_root>/<month>/parquet_text/, sorted chronologically.
 
     Returns list of (path, sort_key). sort_key uses MONTH_ORDER if the
-    directory name is recognized; otherwise it falls back to alphabetical.
+    directory name is recognized, otherwise it falls back to alphabetical.
     """
     out = []
     for d in input_root.iterdir():
