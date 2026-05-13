@@ -7,6 +7,7 @@ Launch with:
 
 import argparse
 import logging
+import math
 import os
 import random
 import time
@@ -145,6 +146,7 @@ def train_steps(
     log_every_steps: int,
     reduce_every_steps: int,
     ema_alpha: float,
+    coverage_factor: float,
     max_wall_seconds: Optional[float],
     start_step: int = 0,
     best_ema_loss_init: float = float('inf'),
@@ -246,6 +248,7 @@ def train_steps(
                 f'ema={ema_loss_global:.4f} best={best_ema_loss:.4f} '
                 f'rate={rate:.2f}it/s eta={eta_s / 3600:.1f}h'
             )
+            coverage_pct = 100 * (1 - math.exp(-step * coverage_factor))
 
             if verbose:
                 wandb.log(
@@ -254,6 +257,7 @@ def train_steps(
                         'train/loss': loss_val,
                         'train/ema_loss_local': ema_loss_local,
                         'train/ema_loss_global': ema_loss_global,
+                        'coverage/expected_pct': coverage_pct,
                     }
                 )
 
@@ -392,8 +396,8 @@ def run_unigraph(
             )
 
     max_steps = getattr(model_args, 'max_steps', 500_000)
+    total_nodes = data.num_nodes
     if full_coverage:
-        total_nodes = data.num_nodes
         nodes_per_step = model_args.batch_size * world_size
         steps_per_epoch = total_nodes // nodes_per_step
         max_steps = max(max_steps, steps_per_epoch)
@@ -424,6 +428,7 @@ def run_unigraph(
                 }
             )
 
+    coverage_factor = (model_args.batch_size * world_size) / total_nodes
     train_steps(
         model=model,
         train_loader=loader,
@@ -438,6 +443,7 @@ def run_unigraph(
         log_every_steps=log_every_steps,
         reduce_every_steps=reduce_every_steps,
         ema_alpha=ema_alpha,
+        coverage_factor=coverage_factor,
         max_wall_seconds=max_wall_seconds,
         start_step=start_step,
         best_ema_loss_init=best_ema_loss_init,
