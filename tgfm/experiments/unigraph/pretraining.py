@@ -12,7 +12,7 @@ import os
 import random
 import time
 from pathlib import Path
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Literal, Optional, Tuple
 
 import numpy as np
 import torch
@@ -101,7 +101,7 @@ def save_checkpoint(
                 'numpy': np.random.get_state(),
                 'python': random.getstate(),
                 'torch_cpu': torch.random.get_rng_state(),
-                'torch_gpu': torch.cuda.get_rng_state_all(),
+                'torch_gpu_all': torch.cuda.random.get_rng_state_all(),
             },
         },
         tmp_path,
@@ -121,10 +121,12 @@ def load_checkpoint(
     model.module.load_state_dict(ckpt['model_state_dict'])
     optimizer.load_state_dict(ckpt['optimizer_state_dict'])
     if 'rng_states' in ckpt:
-        torch.set_rng_state(ckpt['rng_states']['torch'])
-        torch.cuda.set_rng_state(ckpt['rng_states']['cuda'])
-        np.random.set_state(ckpt['rng_states']['numpy'])
         random.setstate(ckpt['rng_states']['python'])
+        np.random.set_state(ckpt['rng_states']['numpy'])
+        torch.cuda.random.set_rng_state_all(
+            [t.cpu() for t in ckpt['rng_states']['torch_gpu_all']]
+        )
+        torch.random.set_rng_state(ckpt['rng_states']['torch_cpu'].cpu())
     return {
         'step': ckpt['step'],
         'ema_loss': ckpt['ema_loss'],
@@ -361,9 +363,9 @@ def run_unigraph(
     if global_rank == 0:
         logging.info(f'Pre-train loader loaded.')
 
-    model = UniGraph(model_args).to(device)
-    model = DDP(
-        model,
+    base_model = UniGraph(model_args).to(device)
+    model: DDP = DDP(
+        base_model,
         device_ids=[local_rank],
         output_device=local_rank,
         find_unused_parameters=False,
@@ -461,7 +463,9 @@ def main() -> None:
         config_file_path = root / args.config_file
         meta_args, experiment_args = parse_args(config_file_path)
         if meta_args.verbose and global_rank == 0:
-            mode = 'offline' if getattr(meta_args, 'wandb_offline', True) else 'online'
+            mode: Literal['online', 'offline'] = (
+                'offline' if getattr(meta_args, 'wandb_offline', True) else 'online'
+            )
             wandb.init(
                 project=getattr(meta_args, 'wandb_project', 'unigraph-pretrain'),
                 name=getattr(meta_args, 'wandb_run_name', None),
@@ -473,7 +477,7 @@ def main() -> None:
             )
             time.sleep(5)  # Helpful for a pottential 409 error on wandb servers.
 
-        seed_everything(meta_args.global_seed + global_rank)
+        seed_everything(meta_args.global_seed)
 
         if global_rank == 0:
             setup_logging(meta_args.log_file_path)

@@ -27,6 +27,7 @@ dev = [
     "pytest-cov>=7.1.0",
     "seaborn>=0.13.2",
     "types-pyyaml>=6.0.12.20260510",
+    "types-requests>=2.33.0.20260513",
 ]
 
 [tool.flit.module]
