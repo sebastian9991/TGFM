@@ -72,9 +72,12 @@ repos:
       - id: sphinx-lint
         name: Check Sphinx
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+  - repo: local
     hooks:
       - id: mypy
         name: mypy
-        exclude: ^test/
+        entry: uv run mypy
+        language: system
+        types_or: [python, pyi]
+        files: ^tgfm/
+        require_serial: true
