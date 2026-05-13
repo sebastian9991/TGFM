@@ -108,7 +108,7 @@ def main() -> None:
         total_dropped += n_dropped
         logging.info(
             f'    resolved: {n_resolved:,}, dropped (unknown endpoint): '
-            f'{n_dropped:,} ({n_dropped/n_in*100:.2f}%)'
+            f'{n_dropped:,} ({n_dropped / n_in * 100:.2f}%)'
         )
         resolved_edges_per_month.append(edges)
 
@@ -120,7 +120,7 @@ def main() -> None:
     logging.info(
         f'Edges: {total_in:,} input -> {total_in - total_dropped:,} resolved -> '
         f'{n_post_dedup:,} deduped '
-        f'(dup rate within resolved: {1 - n_post_dedup/max(n_pre_dedup,1):.1%})'
+        f'(dup rate within resolved: {1 - n_post_dedup / max(n_pre_dedup, 1):.1%})'
     )
 
     src_arr = deduped.get_column('src_id').to_numpy()
@@ -159,7 +159,7 @@ def main() -> None:
 
     graph_path = args.output_root / 'graph.pt'
     torch.save(data, graph_path)
-    logging.info(f'Wrote {graph_path} ' f'({graph_path.stat().st_size / 1e9:.2f} GB)')
+    logging.info(f'Wrote {graph_path} ({graph_path.stat().st_size / 1e9:.2f} GB)')
 
 
 if __name__ == '__main__':
