@@ -10,7 +10,7 @@ from tgfm.utils.path import get_root_dir, get_scratch
 
 @dataclass
 class MetaArguments:
-    """Configuration for data locations, file paths, and global experiment settings."""
+    """Configuration for data locations, file paths, and global experiment setting."""
 
     log_file_path: Optional[str] = field(
         metadata={'help': 'Path to the log file.'},
