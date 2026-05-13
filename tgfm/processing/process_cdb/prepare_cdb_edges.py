@@ -101,7 +101,7 @@ def main() -> None:
                 how='inner',
             )
             .select(['src_id', 'dst_id'])
-            .collect(streaming=True)
+            .collect(engine='streaming')
         )
         n_resolved = len(edges)
         n_dropped = n_in - n_resolved
