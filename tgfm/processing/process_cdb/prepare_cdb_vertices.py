@@ -44,7 +44,7 @@ parser.add_argument('--log-file', default='prepare_vertices.log', type=str)
 
 
 def discover_month_dirs(input_root: Path) -> List[Path]:
-    """Return per-month subdirs that contain a vertices.csv, sorted by month name.
+    """Return per-month subdirs that contain a vertices.csv sorted by month name.
 
     The order doesn't matter here (we dedup with min/max anyway), but having a
     deterministic order makes logging easier to read.
@@ -109,7 +109,7 @@ def main() -> None:
                 pl.col('n_months').cast(pl.Int8),
             ]
         )
-        .collect(streaming=True)  # streaming = doesn't require all data in RAM
+        .collect(engine='streaming')  # streaming = doesn't require all data in RAM
     )
 
     n_unique = len(registry)
