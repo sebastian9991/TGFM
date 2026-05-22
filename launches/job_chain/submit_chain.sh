@@ -21,7 +21,7 @@ echo "  Chunk 1/$num_chunks: $JOB_SCRIPT"
 # Subsequent jobs: depend on the previous one succeeding
 for i in $(seq 2 $num_chunks); do
     jobid=$(sbatch --parsable \
-            --dependency=afterok:$jobid \
+            --dependency=afterany:$jobid \
             --kill-on-invalid-dep=yes \
             --time=03:00:00 \
             $JOB_SCRIPT "$@")

@@ -32,6 +32,18 @@ mkdir -p "$WANDB_DIR" logs
 echo "Master: $MASTER_ADDR:$MASTER_PORT"
 echo "Slurm Nodes: $(($SLURM_NNODES))"
 
+
+
+#Ensure that we do not cancel with time premption
+if [[ -n "$PREV_JOBID" ]]; then
+    prev_state=$(sacct -j "$PREV_JOBID" -X -n -o State | awk '{print $1}')
+    echo "Previous job state: $prev_state"
+    case "$prev_state" in
+        COMPLETED|TIMEOUT) echo "Continuing." ;;
+        *) echo "Aborting chain."; exit 1 ;;
+    esac
+fi
+
 # Static rendezvous: no race condition between nodes for the store.
 # Note the bash -c wrapper so SLURM_NODEID is evaluated in each task.
 srun --gres-flags=allow-task-sharing bash -c "
