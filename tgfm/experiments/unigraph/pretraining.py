@@ -27,7 +27,6 @@ from transformers import AutoTokenizer
 
 from tgfm.dataset.mag import MAG240MGraphDataset
 from tgfm.dataset.mag_memmap import MAG240MMapTextStore
-from tgfm.models.unigraph import UniGraph
 from tgfm.utils.args import ModelArguments, UnigraphArguments, parse_args
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
@@ -363,9 +362,8 @@ def run_unigraph(
     if global_rank == 0:
         logging.info(f'Pre-train loader loaded.')
 
-    base_model = UniGraph(model_args).to(device)
     model: DDP = DDP(
-        base_model,
+        model,
         device_ids=[local_rank],
         output_device=local_rank,
         find_unused_parameters=False,
