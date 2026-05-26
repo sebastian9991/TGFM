@@ -153,7 +153,7 @@ def open_writable_store(
     num_nodes: int,
     seq_len: int,
     tokenizer_name: str,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.memmap, np.memmap, np.ndarray]:
     """Allocate empty memmap files. Returns (mmap_ids, mmap_mask, has_text bool array).
 
     Use this from the builder script. The mmaps are 'w+' mode so writes

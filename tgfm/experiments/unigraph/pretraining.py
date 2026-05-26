@@ -7,11 +7,12 @@ Launch with:
 
 import argparse
 import logging
+import math
 import os
 import random
 import time
 from pathlib import Path
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Literal, Optional, Tuple
 
 import numpy as np
 import torch
@@ -26,7 +27,6 @@ from transformers import AutoTokenizer
 
 from tgfm.dataset.mag import MAG240MGraphDataset
 from tgfm.dataset.mag_memmap import MAG240MMapTextStore
-from tgfm.models.unigraph import UniGraph
 from tgfm.utils.args import ModelArguments, UnigraphArguments, parse_args
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
@@ -100,7 +100,7 @@ def save_checkpoint(
                 'numpy': np.random.get_state(),
                 'python': random.getstate(),
                 'torch_cpu': torch.random.get_rng_state(),
-                'torch_gpu': torch.cuda.get_rng_state_all(),
+                'torch_gpu_all': torch.cuda.random.get_rng_state_all(),
             },
         },
         tmp_path,
@@ -116,14 +116,16 @@ def load_checkpoint(
 ) -> dict:
     """Load a checkpoint. Returns metadata dict. Called on all ranks."""
     # TODO: Look at how load_checkpoint is implemented in the mila docs. In the multi-node/multi-gpu example.
-    ckpt = torch.load(path, map_location=device)
+    ckpt = torch.load(path, map_location=device, weights_only=False)
     model.module.load_state_dict(ckpt['model_state_dict'])
     optimizer.load_state_dict(ckpt['optimizer_state_dict'])
     if 'rng_states' in ckpt:
-        torch.set_rng_state(ckpt['rng_states']['torch'])
-        torch.cuda.set_rng_state(ckpt['rng_states']['cuda'])
-        np.random.set_state(ckpt['rng_states']['numpy'])
         random.setstate(ckpt['rng_states']['python'])
+        np.random.set_state(ckpt['rng_states']['numpy'])
+        torch.cuda.random.set_rng_state_all(
+            [t.cpu() for t in ckpt['rng_states']['torch_gpu_all']]
+        )
+        torch.random.set_rng_state(ckpt['rng_states']['torch_cpu'].cpu())
     return {
         'step': ckpt['step'],
         'ema_loss': ckpt['ema_loss'],
@@ -145,6 +147,7 @@ def train_steps(
     log_every_steps: int,
     reduce_every_steps: int,
     ema_alpha: float,
+    coverage_factor: float,
     max_wall_seconds: Optional[float],
     start_step: int = 0,
     best_ema_loss_init: float = float('inf'),
@@ -246,6 +249,7 @@ def train_steps(
                 f'ema={ema_loss_global:.4f} best={best_ema_loss:.4f} '
                 f'rate={rate:.2f}it/s eta={eta_s / 3600:.1f}h'
             )
+            coverage_pct = 100 * (1 - math.exp(-step * coverage_factor))
 
             if verbose:
                 wandb.log(
@@ -254,6 +258,7 @@ def train_steps(
                         'train/loss': loss_val,
                         'train/ema_loss_local': ema_loss_local,
                         'train/ema_loss_global': ema_loss_global,
+                        'coverage/expected_pct': coverage_pct,
                     }
                 )
 
@@ -357,8 +362,7 @@ def run_unigraph(
     if global_rank == 0:
         logging.info(f'Pre-train loader loaded.')
 
-    model = UniGraph(model_args).to(device)
-    model = DDP(
+    model: DDP = DDP(
         model,
         device_ids=[local_rank],
         output_device=local_rank,
@@ -392,8 +396,8 @@ def run_unigraph(
             )
 
     max_steps = getattr(model_args, 'max_steps', 500_000)
+    total_nodes = data.num_nodes
     if full_coverage:
-        total_nodes = data.num_nodes
         nodes_per_step = model_args.batch_size * world_size
         steps_per_epoch = total_nodes // nodes_per_step
         max_steps = max(max_steps, steps_per_epoch)
@@ -424,6 +428,7 @@ def run_unigraph(
                 }
             )
 
+    coverage_factor = (model_args.batch_size * world_size) / total_nodes
     train_steps(
         model=model,
         train_loader=loader,
@@ -438,6 +443,7 @@ def run_unigraph(
         log_every_steps=log_every_steps,
         reduce_every_steps=reduce_every_steps,
         ema_alpha=ema_alpha,
+        coverage_factor=coverage_factor,
         max_wall_seconds=max_wall_seconds,
         start_step=start_step,
         best_ema_loss_init=best_ema_loss_init,
@@ -455,7 +461,9 @@ def main() -> None:
         config_file_path = root / args.config_file
         meta_args, experiment_args = parse_args(config_file_path)
         if meta_args.verbose and global_rank == 0:
-            mode = 'offline' if getattr(meta_args, 'wandb_offline', True) else 'online'
+            mode: Literal['online', 'offline'] = (
+                'offline' if getattr(meta_args, 'wandb_offline', True) else 'online'
+            )
             wandb.init(
                 project=getattr(meta_args, 'wandb_project', 'unigraph-pretrain'),
                 name=getattr(meta_args, 'wandb_run_name', None),
@@ -467,7 +475,7 @@ def main() -> None:
             )
             time.sleep(5)  # Helpful for a pottential 409 error on wandb servers.
 
-        seed_everything(meta_args.global_seed + global_rank)
+        seed_everything(meta_args.global_seed)
 
         if global_rank == 0:
             setup_logging(meta_args.log_file_path)
