@@ -67,7 +67,8 @@ def medium_graph() -> Data:
 @pytest.fixture(scope="session")
 def medium_graph_params() -> dict:
     """The parameters used to build `medium_graph`, exposed for tests that
-    need them (e.g. asserting partition count, block boundaries)."""
+    need them (e.g. asserting partition count, block boundaries).
+    """
     return dict(
         num_blocks=NUM_BLOCKS,
         nodes_per_block=NODES_PER_BLOCK,
