@@ -59,10 +59,14 @@ def build_local_views_metis(
     N = data.num_nodes
     device = data.edge_index.device
 
+    part = getattr(cluster_data, 'partition', None)
+
     # ClusterData stores a permutation + partition pointers. We reconstruct
     # the original node-id sets per partition.
-    perm = cluster_data.perm  # (N,) old_id from new_id position
-    partptr = cluster_data.partptr  # (num_parts+1,)
+    assert part is not None
+
+    perm = part.node_perm  # (N,)
+    partptr = part.partptr  # (num_parts +1, )
 
     for p in range(num_parts):
         start, end = int(partptr[p]), int(partptr[p + 1])
