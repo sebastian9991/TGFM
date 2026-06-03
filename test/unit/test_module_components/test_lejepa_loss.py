@@ -13,8 +13,7 @@ V_GLOBAL = 8
 V_LOCAL = 2
 @pytest.fixture(scope="session")
 def view_embeddings() -> Tuple[Tensor, Tensor]:
-    """(z_global, z_local) with standard-normal entries.
-    """
+    """Testing (z_global, z_local) with standard-normal entries."""
     g = torch.Generator().manual_seed(SEED)
     z_global = torch.randn(B, V_GLOBAL, DIM, generator=g)
     z_local = torch.randn(B, V_LOCAL, DIM, generator=g)
@@ -22,8 +21,7 @@ def view_embeddings() -> Tuple[Tensor, Tensor]:
 
 
 def test_output_shape_contract(view_embeddings):
-    """LeJEPALossOutput fields are scalar tensors with the expected attachment.
-    """
+    """Testing LeJEPALossOutput fields are scalar tensors with the expected attachment."""
     z_global, z_local = view_embeddings
     loss = LeJEPALoss()
     out = loss(z_global, z_local)
@@ -41,7 +39,7 @@ def test_output_shape_contract(view_embeddings):
 
 
 def test_output_nonneg(view_embeddings):
-    """pred is squared-L2 (>=0); sigreg is Epps-Pulley (>=0). total = convex combo."""
+    """Testing pred is squared-L2 (>=0); sigreg is Epps-Pulley (>=0). total = convex combo."""
     z_global, z_local = view_embeddings
     out = LeJEPALoss()(z_global, z_local)
     assert out.pred.item() >= 0
@@ -50,8 +48,7 @@ def test_output_nonneg(view_embeddings):
 
 
 def test_gradient_flows_through_global_views(view_embeddings):
-    """Gradients must reach z_global, including via the centroid mu.
-    """
+    """Testing Gradients must reach z_global, including via the centroid mu."""
     z_global, z_local = view_embeddings
     z_global = z_global.clone().requires_grad_(True)
     z_local = z_local.clone().requires_grad_(True)
@@ -82,7 +79,7 @@ def test_lambda_zero_equals_pred(view_embeddings):
 
 
 def test_lambda_one_equals_sigreg(view_embeddings):
-    """lambd=1 -> total = sigreg (pred term zeroed out)."""
+    """Testing lambd=1 -> total = sigreg (pred term zeroed out)."""
     z_global, z_local = view_embeddings
     out = LeJEPALoss(lambd=1.0)(z_global, z_local)
     assert torch.allclose(out.total, out.sigreg, atol=1e-6), (
@@ -92,8 +89,7 @@ def test_lambda_one_equals_sigreg(view_embeddings):
 
 
 def test_lambda_convex_combination(view_embeddings):
-    """At arbitrary lambd, total = (1-lambd)*pred + lambd*sigreg.
-    """
+    """At arbitrary lambd, total = (1-lambd)*pred + lambd*sigreg."""
     z_global, z_local = view_embeddings
     lambd = 0.3
 

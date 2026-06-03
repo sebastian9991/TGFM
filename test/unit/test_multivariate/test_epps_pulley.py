@@ -1,4 +1,4 @@
-""" Tests for `EppsPulley` (univariate test) and `SlicingUnivariateTest` (the
+"""Tests for `EppsPulley` (univariate test) and `SlicingUnivariateTest` (the
 multivariate wrapper that defines SIGReg in the LeJEPA paper).
 
 Key correctness property (the headline test):
