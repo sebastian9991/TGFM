@@ -161,9 +161,9 @@ def test_loader_sample_batch_size(medium_graph):
 
 def test_loader_prepared_subgraph_contract(medium_graph):
     """Each PreparedSubgraph from the loader satisfies the per-element shape contract.
-    .source has matching .x and (sliced) .rwse rows
-    .global_views and .local_views are non-empty
-     each view's pe.size(0) == x.size(0)
+    Source has matching .x and (sliced) .rwse rows.
+    Global_views and .local_views are non-empty.
+    Each view's pe.size(0) == x.size(0).
     """
     cache = FullGraphEncodingsCache(full_data=medium_graph, K=8)
     cache.precompute()
