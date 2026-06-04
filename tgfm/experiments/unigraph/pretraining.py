@@ -365,6 +365,7 @@ def run_unigraph(
 
     unigraph = UniGraph(model_args)
     unigraph.to(device=device)
+
     model: DDP = DDP(
         unigraph,
         device_ids=[local_rank],
