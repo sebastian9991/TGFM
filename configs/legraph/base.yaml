@@ -1,0 +1,22 @@
+MetaArguments:
+  log_file_path: "legraph_training.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: ""
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    LeGraph:
+      model_args:
+        model: "LeGraph"
+        num_neighbors: [4, 2, 1]
+        batch_size: 16
+        dropout: 0.2
+        lr: 5.0e-3
+        weight_decay: 1.0e-2
+        device: 0
+      data_args:
+        data_name: 'amazon-photos'
+        task_name: ""
