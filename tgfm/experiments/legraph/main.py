@@ -215,9 +215,6 @@ def train(
             V_l=V_l,
         )
 
-        # Seed SIGReg with step * V to avoid overlap between steps; per-view
-        # TODO: Why do we have to do this seeding?
-        # offset is added inside LeJEPALoss.
         out = loss_fn(z_global, z_local)
 
         optim.zero_grad(
