@@ -215,6 +215,7 @@ class ExperimentArguments:
 
 MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'Unigraph': UnigraphArguments,
+    'GraphGPS': GraphGPSArguments,
 }
 
 
