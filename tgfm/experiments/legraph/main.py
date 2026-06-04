@@ -35,6 +35,7 @@ from typing import Optional
 
 import torch
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from tgfm.dataset.evaluation.linear_prob_pyg import (
     compute_node_embeddings,
@@ -174,6 +175,11 @@ def train(
         encoder.parameters(), lr=model_args.lr, weight_decay=model_args.weight_decay
     )
 
+    # Recommended from LeJEPA paper.
+    scheduler = CosineAnnealingWarmRestarts(
+        optimizer=optim, T_0=20
+    )  # TODO: Paramaterize this.
+
     logging.info(
         'Encoder params: %.2fM',
         sum(p.numel() for p in encoder.parameters()) / 1e6,
@@ -219,6 +225,7 @@ def train(
         )  # Is set to none correct here? Should it be set to zero by default?
         out.total.backward()
         optim.step()
+        scheduler.step()
 
         if out.total < best_loss:
             save_checkpoint(
