@@ -96,14 +96,22 @@ class ModelArguments:
         default=2.36e-5, metadata={'help': 'Weight decay on the optimizer.'}
     )
     batch_size: int = field(default=32)
+    num_steps: int = field(
+        default=100, metadata={'help': 'The number of steps of training.'}
+    )
     epochs: int = field(default=100, metadata={'help': 'Number of epochs.'})
     runs: int = field(default=3, metadata={'help': 'Number of trials.'})
     patience: int = field(
         default=10,
         metadata={'help': 'Number of epochs to wait before no validation improvement.'},
     )
-    eval_frequency: int = field(default=500)
-    eval_repeat: int = field(default=1)
+    eval_frequency: int = field(
+        default=500, metadata={'help': 'The frequency of evaluation.'}
+    )
+    eval_repeat: int = field(default=1, metadata={'help': 'The repeats of evaluation.'})
+    log_frequency: int = field(
+        default=10, metadata={'help': 'The frequency of logging.'}
+    )
     use_cuda: bool = field(default=True, metadata={'help': 'Whether to use cuda.'})
     device: int = field(default=0, metadata={'help': 'Device to be used.'})
 
