@@ -21,6 +21,7 @@ def get_dataset(
         'amazon-computers': (datasets.Amazon, {'name': 'Computers'}),
         'amazon-photos': (datasets.Amazon, {'name': 'Photo'}),
         'cora': (datasets.Planetoid, {'name': 'Cora'}),
+        'TUDataset': (datasets.TUDataset, {'name': 'PROTIENS'}),
         'wikics': (datasets.WikiCS, {}),
     }
 
