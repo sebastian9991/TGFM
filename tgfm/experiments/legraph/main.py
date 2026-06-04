@@ -36,6 +36,7 @@ from typing import Optional
 import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from tqdm import tqdm
 
 from tgfm.dataset.evaluation.linear_prob_pyg import (
     compute_node_embeddings,
@@ -188,7 +189,7 @@ def train(
     eval_freq = model_args.eval_frequency
     eval_repeat = model_args.eval_repeat
     best_loss: float = float('inf')
-    for step in range(model_args.num_steps):
+    for step in tqdm(range(model_args.num_steps), desc='Training steps'):
         batch = preparer.sample_batch(model_args.batch_size)
         if len(batch) < model_args.batch_size:
             logging.warning(
