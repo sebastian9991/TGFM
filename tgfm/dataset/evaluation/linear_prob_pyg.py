@@ -184,6 +184,7 @@ def evaluate_linear_probe(
     X = embeddings.cpu().numpy()
     y = full_data.y.cpu().numpy()
 
+    assert X.shape[0] == y.shape[0]
     has_masks = (
         hasattr(full_data, 'train_mask')
         and hasattr(full_data, 'val_mask')
