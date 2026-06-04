@@ -10,7 +10,7 @@ ExperimentArguments:
   exp_args:
     LeGraph:
       model_args:
-        model: "LeGraph"
+        model: "GraphGPS"
         num_neighbors: [4, 2, 1]
         batch_size: 16
         dropout: 0.2
