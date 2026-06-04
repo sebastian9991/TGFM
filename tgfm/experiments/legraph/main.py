@@ -47,7 +47,7 @@ from tgfm.dataset.pyg.data import (
     SubgraphPreparer,
     get_dataset,
 )
-from tgfm.models.graph_gps import GraphGPSEncoder, LinearEncoder
+from tgfm.models.graphgps import GraphGPSEncoder, LinearEncoder
 from tgfm.models.leJepa_loss import LeJEPALoss
 from tgfm.utils.args import (
     DataArguments,
