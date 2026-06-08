@@ -115,11 +115,21 @@ def train(
     assert isinstance(model_args, GraphGPSArguments)
 
     # 1. Load dataset
-    transform = T.Compose([T.NormalizeFeatures(), T.ToUndirected(), T.AddSelfLoops()])
+    transform = T.Compose(
+        [
+            T.NormalizeFeatures(),
+            T.ToUndirected(),
+            T.AddSelfLoops(),
+            T.RemoveIsolatedNodes(),
+        ]
+    )
     dataset = get_dataset(
         root=str(meta_args.root_dir), name=data_args.data_name, transform=transform
     )
     full_data = dataset[0]
+    assert full_data.has_isolated_nodes() == False
+    assert full_data.has_self_loops() == True
+    assert full_data.is_directed() == False
     logging.info(
         'Loaded %s: N=%d nodes, E=%d edges, in_dim=%d',
         data_args.data_name,
