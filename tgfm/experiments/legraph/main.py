@@ -35,13 +35,16 @@ from typing import Optional
 
 import torch
 import torch_geometric.transforms as T
+from torch import Tensor
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch_geometric.data import Data
 from tqdm import tqdm
 
 from tgfm.dataset.evaluation.linear_prob_pyg import (
     compute_node_embeddings,
     evaluate_linear_probe,
+    node_classification,
 )
 from tgfm.dataset.pyg.data import (
     FullGraphEncodingsCache,
@@ -104,6 +107,34 @@ def save_checkpoint(
     tmp_path = path.with_suffix(path.suffix + '.tmp')
     torch.save(payload, tmp_path)
     tmp_path.rename(path)
+
+
+def evaluate(
+    embeddings: Tensor,
+    full_data: Data,
+    repeat: int,
+    data_random_seed: int,
+    dataset: str,
+) -> dict:
+    results = evaluate_linear_probe(
+        embeddings,
+        full_data,
+        repeat=repeat,
+        data_random_seed=data_random_seed,
+    )
+    has_masks = (
+        hasattr(full_data, 'train_mask')
+        and hasattr(full_data, 'val_mask')
+        and hasattr(full_data, 'test_mask')
+        and full_data.train_mask is not None
+    )
+    if has_masks:
+        masks = (full_data.train_mask, full_data.val_mask, full_data.test_mask)
+    else:
+        masks = None
+
+    node_classification(Z=embeddings, Y=full_data.y, dataset=dataset, masks=masks)
+    return results
 
 
 def train(
@@ -281,11 +312,12 @@ def train(
                 se=cache.full_se,
                 device=model_args.device,
             )
-            results = evaluate_linear_probe(
+            results = evaluate(
                 embeddings,
                 full_data,
                 repeat=eval_repeat,
                 data_random_seed=meta_args.global_seed,
+                dataset=data_args.data_name,
             )
             logging.info(
                 'step=%d prob[%s] acc=%.4f +/- %4.f over %d splits',
@@ -304,11 +336,12 @@ def train(
             se=cache.full_se,
             device=model_args.device,
         )
-        results = evaluate_linear_probe(
+        results = evaluate(
             embeddings,
             full_data,
             repeat=eval_repeat,
             data_random_seed=meta_args.global_seed,
+            dataset=data_args.data_name,
         )
         logging.info(
             'FINAL step=%d prob[%s] acc=%.4f +/- %4.f over %d splits',
