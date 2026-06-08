@@ -115,6 +115,7 @@ def evaluate(
     repeat: int,
     data_random_seed: int,
     dataset: str,
+    full_eval: bool = False,
 ) -> dict:
     results = evaluate_linear_probe(
         embeddings,
@@ -133,7 +134,9 @@ def evaluate(
     else:
         masks = None
 
-    node_classification(Z=embeddings, Y=full_data.y, dataset=dataset, masks=masks)
+    if full_eval:
+        node_classification(Z=embeddings, Y=full_data.y, dataset=dataset, masks=masks)
+
     return results
 
 
@@ -342,6 +345,7 @@ def train(
             repeat=eval_repeat,
             data_random_seed=meta_args.global_seed,
             dataset=data_args.data_name,
+            full_eval=True,
         )
         logging.info(
             'FINAL step=%d prob[%s] acc=%.4f +/- %4.f over %d splits',
