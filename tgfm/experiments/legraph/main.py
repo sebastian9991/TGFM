@@ -123,18 +123,18 @@ def evaluate(
         repeat=repeat,
         data_random_seed=data_random_seed,
     )
-    has_masks = (
-        hasattr(full_data, 'train_mask')
-        and hasattr(full_data, 'val_mask')
-        and hasattr(full_data, 'test_mask')
-        and full_data.train_mask is not None
-    )
-    if has_masks:
-        masks = (full_data.train_mask, full_data.val_mask, full_data.test_mask)
-    else:
-        masks = None
 
     if full_eval:
+        has_masks = (
+            hasattr(full_data, 'train_mask')
+            and hasattr(full_data, 'val_mask')
+            and hasattr(full_data, 'test_mask')
+            and full_data.train_mask is not None
+        )
+        if has_masks:
+            masks = (full_data.train_mask, full_data.val_mask, full_data.test_mask)
+        else:
+            masks = None
         node_classification(Z=embeddings, Y=full_data.y, dataset=dataset, masks=masks)
 
     return results
