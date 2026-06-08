@@ -228,7 +228,7 @@ def prepare_subgraph(
     global_strategy: str = 'bfs',
     rwse: Optional[Tensor] = None,
     se: Optional[Tensor] = None,
-    transform: bool = True,
+    transform_views: bool = False,
 ) -> PreparedSubgraph:
     """Prepare global+local views for one subgraph.
 
@@ -249,13 +249,13 @@ def prepare_subgraph(
         se:   Optional precomputed structural encoding (any shape (N, S)).
               Stored on every view's Data as `data.se` for the encoder's SE
               branch. Same slicing caveat as `rwse`.
-        transform: Default transform found in torch_geometric.transform. By default we use
+        transform_views: bool. Choose whether to default transform found in torch_geometric.transform. By default we use
                    ToUndirected(), AddSelfLoops(), RemoveIsolatedNodes().
     """
     if rwse is None:
         rwse = compute_rwse(data, K=K)
 
-    if transform:
+    if transform_views:
         transform = T.Compose(
             [
                 T.AddSelfLoops(),
@@ -263,6 +263,8 @@ def prepare_subgraph(
                 T.ToUndirected(),
             ]
         )
+    else:
+        transform = None
 
     locals_ = build_local_views_metis(
         data,

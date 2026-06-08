@@ -186,7 +186,6 @@ class SubgraphPreparer:
                     ego,
                     rwse=rwse_ego,
                     se=se_ego,
-                    transform=False,
                     **self.prepare_kwargs,
                 )
             )
