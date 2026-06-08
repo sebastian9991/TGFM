@@ -14,12 +14,14 @@ Plus the encoder-side helper:
                                (N, dim) node embeddings for the probe.
 """
 
-from typing import Optional
+import logging
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score
 from sklearn.model_selection import (
     GridSearchCV,
     ShuffleSplit,
@@ -29,6 +31,7 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.preprocessing import OneHotEncoder, normalize
 from torch import Tensor
 from torch_geometric.data import Data
+from tqdm import tqdm
 
 
 @torch.no_grad()
@@ -221,3 +224,175 @@ def evaluate_linear_probe(
         'std': float(arr.std()),
         'probe_type': probe_type,
     }
+
+
+# --------SSGE Evaluation Utilities --------
+
+
+class LogisticRegressionCustom(torch.nn.Module):
+    def __init__(self, num_features: int, num_classes: int):
+        super(LogisticRegressionCustom, self).__init__()
+        self.fc = torch.nn.Linear(num_features, num_classes)
+        torch.nn.init.xavier_uniform_(self.fc.weight.data)
+
+    def forward(self, X: Tensor) -> Tensor:
+        Z = self.fc(X)
+        return Z
+
+
+def split4NC(n_samples: int, train_ratio: float = 0.1, test_ratio: float = 0.8) -> Dict:
+    """Split node set for Node Classification."""
+    assert train_ratio + test_ratio < 1
+    train_size = int(n_samples * train_ratio)
+    test_size = int(n_samples * test_ratio)
+    indices = torch.randperm(n_samples)
+    return {
+        'train': indices[:train_size],
+        'valid': indices[train_size : test_size + train_size],
+        'test': indices[test_size + train_size :],
+    }
+
+
+class LREvaluator4NC:
+    def __init__(
+        self,
+        num_epochs: int = 5000,
+        learning_rate: float = 0.01,
+        weight_decay: float = 1e-4,
+        test_interval: int = 20,
+    ):
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.test_interval = test_interval
+
+    def evaluate(self, x: Tensor, y: Tensor, split: dict) -> Dict:
+        for key in ['train', 'test', 'valid']:
+            assert key in split
+        device = x.device
+        x = x.detach().to(device)
+        input_dim = x.size()[1]
+        y = y.to(device)
+        num_classes = y.max().item() + 1
+        classifier = LogisticRegressionCustom(input_dim, int(num_classes)).to(device)
+        optimizer = torch.optim.Adam(
+            classifier.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
+        )
+        output_fn = torch.nn.LogSoftmax(dim=-1)
+        criterion = torch.nn.NLLLoss()
+
+        best_val_micro = 0
+        best_test_micro = 0
+        best_test_macro = 0
+
+        with tqdm(
+            total=self.num_epochs,
+            desc='(LR)',
+            bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}{postfix}]',
+        ) as pbar:
+            for epoch in range(self.num_epochs):
+                classifier.train()
+                optimizer.zero_grad()
+
+                output = classifier(x[split['train']])
+                loss = criterion(output_fn(output), y[split['train']])
+
+                loss.backward()
+                optimizer.step()
+
+                if (epoch + 1) % self.test_interval == 0:
+                    classifier.eval()
+                    y_test = y[split['test']].detach().cpu().numpy()
+                    Y_pred = (
+                        classifier(x[split['test']]).argmax(-1).detach().cpu().numpy()
+                    )
+                    test_micro = f1_score(y_test, Y_pred, average='micro')
+                    test_macro = f1_score(y_test, Y_pred, average='macro')
+
+                    y_val = y[split['valid']].detach().cpu().numpy()
+                    Y_pred = (
+                        classifier(x[split['valid']]).argmax(-1).detach().cpu().numpy()
+                    )
+                    val_micro = f1_score(y_val, Y_pred, average='micro')
+
+                    if val_micro > best_val_micro:
+                        best_val_micro = val_micro
+                        best_test_micro = test_micro
+                        best_test_macro = test_macro
+
+                    pbar.set_postfix(
+                        {'best test MiF1': best_test_micro, 'MaF1': best_test_macro}
+                    )
+                    pbar.update(self.test_interval)
+
+        return {'MiF1': best_test_micro, 'MaF1': best_test_macro}
+
+
+def node_classification(
+    Z: Tensor,
+    Y: Tensor,
+    dataset: str,
+    n_repeats: int = 10,
+    lr: float = 0.01,
+    wd: float = 1e-4,
+    masks: Optional[Tuple[Tensor, Tensor, Tensor]] = None,
+) -> None:
+    """Evaluate node representations on node classification."""
+    # fix_seed(0)
+    n_nodes = Z.shape[0]
+    MiF1s: List[Any] = []
+    MaF1s: List[Any] = []
+    if dataset == 'WikiCS':
+        assert masks is not None
+        train_masks = masks[0]
+        val_masks = masks[1]
+        test_mask = masks[2]
+        indices = torch.arange(n_nodes, device=Z.device)
+        for i in range(20):
+            split = {
+                'train': indices[train_masks[:, i]],
+                'valid': indices[val_masks[:, i]],
+                'test': indices[test_mask],
+            }
+            res = LREvaluator4NC(
+                num_epochs=3000, learning_rate=lr, weight_decay=wd
+            ).evaluate(Z, Y, split)
+            MiF1s.append(res['MiF1'])
+            MaF1s.append(res['MaF1'])
+    else:
+        if masks is not None:
+            train_mask = masks[0]
+            val_mask = masks[1]
+            test_mask = masks[2]
+            indices = torch.arange(n_nodes, device=Z.device)
+            for i in range(n_repeats):
+                split = {
+                    'train': indices[train_mask],
+                    'valid': indices[val_mask],
+                    'test': indices[test_mask],
+                }
+                res = LREvaluator4NC(
+                    num_epochs=3000, learning_rate=lr, weight_decay=wd
+                ).evaluate(Z, Y, split)
+                MiF1s.append(res['MiF1'])
+                MaF1s.append(res['MaF1'])
+        else:
+            for i in range(n_repeats):
+                split = split4NC(n_nodes, train_ratio=0.1, test_ratio=0.8)
+                res = LREvaluator4NC(
+                    num_epochs=3000, learning_rate=lr, weight_decay=wd
+                ).evaluate(Z, Y, split)
+                MiF1s.append(res['MiF1'])
+                MaF1s.append(res['MaF1'])
+    MiF1s_np = np.array(MiF1s)
+    assert isinstance(MiF1s_np, np.ndarray)
+    MaF1s_np = np.array(MaF1s)
+    assert isinstance(MaF1s_np, np.ndarray)
+    micro_mean = MiF1s_np.mean() * 100
+    micro_std = MiF1s_np.std() * 100
+    macro_mean = MaF1s_np.mean() * 100
+    macro_std = MaF1s_np.std() * 100
+    s = f'MiF1={micro_mean:.2f}+-{micro_std:.2f}, MaF1={macro_mean:.2f}+-{macro_std:.2f}'
+    logging.info(f'Evaluation stats: {s}')
