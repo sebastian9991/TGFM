@@ -115,7 +115,7 @@ def train(
     assert isinstance(model_args, GraphGPSArguments)
 
     # 1. Load dataset
-    transform = T.Compose([T.NormalizeFeatures(), T.ToUndirected()])
+    transform = T.Compose([T.NormalizeFeatures(), T.ToUndirected(), T.AddSelfLoops()])
     dataset = get_dataset(
         root=str(meta_args.root_dir), name=data_args.data_name, transform=transform
     )
