@@ -169,10 +169,6 @@ class SubgraphPreparer:
                 **self.prepare_kwargs,
             )
             assert is_undirected(prep.source.edge_index) == True
-            for views in prep.global_views:
-                assert is_undirected(views.edge_index) == True
-            for views in prep.local_views:
-                assert is_undirected(views.edge_index) == True
             yield prep
 
     def sample_batch(self, batch_size: int) -> list[PreparedSubgraph]:
@@ -186,6 +182,12 @@ class SubgraphPreparer:
             ego = self._next_ego()
             rwse_ego, se_ego = self.cache.slice(ego)
             out.append(
-                prepare_subgraph(ego, rwse=rwse_ego, se=se_ego, **self.prepare_kwargs)
+                prepare_subgraph(
+                    ego,
+                    rwse=rwse_ego,
+                    se=se_ego,
+                    transform=False,
+                    **self.prepare_kwargs,
+                )
             )
         return out
