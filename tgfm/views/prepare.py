@@ -33,10 +33,6 @@ def safe_cluster(data: Data, num_parts: int) -> None:
 
     if n == 0:
         raise ValueError('METIS called on empty subgraph (0 vertices)')
-    if num_parts > n:
-        raise ValueError(
-            f'num_parts={num_parts} > num_nodes={n}' f"(METIS: 'too many parts')"
-        )
 
 
 def compute_rwse(data: Data, K: int) -> Tensor:
