@@ -16,7 +16,7 @@ from torch import Tensor
 from torch_geometric.data import Data
 from torch_geometric.loader import ClusterData  # METIS wrapper
 from torch_geometric.transforms import AddRandomWalkPE, BaseTransform
-from torch_geometric.utils import k_hop_subgraph, subgraph
+from torch_geometric.utils import k_hop_subgraph, subgraph, to_undirected
 
 
 @dataclass
@@ -63,7 +63,9 @@ def build_local_views_metis(
     """
     # ClusterData internally uses METIS (via torch-sparse / pyg-lib).
     safe_cluster(data=data, num_parts=num_parts)
-    cluster_data = ClusterData(data, num_parts=num_parts, log=False)
+    metis_ei = to_undirected(data.edge_index, num_nodes=data.num_nodes)
+    metis_data = Data(edge_index=metis_ei, num_nodes=data.num_nodes)
+    cluster_data = ClusterData(metis_data, num_parts=num_parts, log=False)
 
     views: List[Data] = []
     N = data.num_nodes
@@ -256,9 +258,9 @@ def prepare_subgraph(
     if transform:
         transform = T.Compose(
             [
-                T.ToUndirected(),
                 T.AddSelfLoops(),
                 T.RemoveIsolatedNodes(),
+                T.ToUndirected(),
             ]
         )
 
