@@ -7,7 +7,7 @@ from torch_geometric import datasets
 from torch_geometric.data import Data, InMemoryDataset
 from torch_geometric.loader import NeighborLoader
 from torch_geometric.transforms import BaseTransform, NormalizeFeatures
-from torch_geometric.utils import is_undirected, to_undirected
+from torch_geometric.utils import to_undirected
 
 from tgfm.views.prepare import PreparedSubgraph, compute_rwse, prepare_subgraph
 
@@ -151,25 +151,25 @@ class SubgraphPreparer:
             self._it = iter(self.loader)
         try:
             ego = next(self._it)
-            ego.edge_index = to_undirected(ego.edge_index, num_nodes=ego.num_nodes)
+            # ego.edge_index = to_undirected(ego.edge_index, num_nodes=ego.num_nodes)
             return ego
         except StopIteration:
             self._it = iter(self.loader)
             ego = next(self._it)
-            ego.edge_index = to_undirected(ego.edge_index, num_nodes=ego.num_nodes)
+            # ego.edge_index = to_undirected(ego.edge_index, num_nodes=ego.num_nodes)
             return ego
 
-    def __iter__(self) -> Iterator[PreparedSubgraph]:
-        for ego in self.loader:
-            rwse_ego, se_ego = self.cache.slice(ego)
-            prep = prepare_subgraph(
-                ego,
-                rwse=rwse_ego,
-                se=se_ego,
-                **self.prepare_kwargs,
-            )
-            assert is_undirected(prep.source.edge_index) == True
-            yield prep
+    # def __iter__(self) -> Iterator[PreparedSubgraph]:
+    #     for ego in self.loader:
+    #         rwse_ego, se_ego = self.cache.slice(ego)
+    #         prep = prepare_subgraph(
+    #             ego,
+    #             rwse=rwse_ego,
+    #             se=se_ego,
+    #             **self.prepare_kwargs,
+    #         )
+    #         assert is_undirected(prep.source.edge_index) == True
+    #         yield prep
 
     def sample_batch(self, batch_size: int) -> list[PreparedSubgraph]:
         """Convenience: pull `batch_size` PreparedSubgraphs in sequence.
@@ -181,12 +181,12 @@ class SubgraphPreparer:
         for _ in range(batch_size):
             ego = self._next_ego()
             rwse_ego, se_ego = self.cache.slice(ego)
-            out.append(
-                prepare_subgraph(
-                    ego,
-                    rwse=rwse_ego,
-                    se=se_ego,
-                    **self.prepare_kwargs,
-                )
+            prep = prepare_subgraph(
+                ego,
+                rwse=rwse_ego,
+                se=se_ego,
+                **self.prepare_kwargs,
             )
+            out.append(prep)
+            # assert is_undirected(prep.source.edge_index) == True
         return out
