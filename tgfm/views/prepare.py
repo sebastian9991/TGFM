@@ -15,7 +15,7 @@ from torch import Tensor
 from torch_geometric.data import Data
 from torch_geometric.loader import ClusterData  # METIS wrapper
 from torch_geometric.transforms import AddRandomWalkPE
-from torch_geometric.utils import k_hop_subgraph, subgraph
+from torch_geometric.utils import k_hop_subgraph, subgraph, to_undirected
 
 
 @dataclass
@@ -83,6 +83,7 @@ def build_local_views_metis(
             num_nodes=N,
         )
 
+        sub_ei = to_undirected(edge_index=sub_ei)
         view = Data(
             x=data.x[sub_nodes],
             edge_index=sub_ei,
@@ -131,6 +132,7 @@ def build_global_views(
             raise ValueError(f'Unknown global view strategy: {strategy}')
 
         sub_ei, _ = subgraph(nodes, data.edge_index, relabel_nodes=True, num_nodes=N)
+        sub_ei = to_undirected(edge_index=sub_ei)
         view = Data(
             x=data.x[nodes],
             edge_index=sub_ei,
