@@ -282,6 +282,7 @@ def train(
             logging.info(
                 f'[step {step + 1}] New best loss {out.total:4f} saved best.pt'
             )
+            best_loss = out.total
 
         if step % model_args.log_frequency == 0 or step == model_args.num_steps - 1:
             with torch.no_grad():
