@@ -238,6 +238,7 @@ def train(
     eval_freq = model_args.eval_frequency
     eval_repeat = model_args.eval_repeat
     best_loss: float = float('inf')
+    assert cache.full_rwse is not None
     for step in tqdm(range(model_args.num_steps), desc='Training steps'):
         batch = preparer.sample_batch(model_args.batch_size)
         if len(batch) < model_args.batch_size:
@@ -282,7 +283,6 @@ def train(
                 f'[step {step + 1}] New best loss {out.total:4f} saved best.pt'
             )
 
-        assert cache.full_rwse is not None
         if step % model_args.log_frequency == 0 or step == model_args.num_steps - 1:
             with torch.no_grad():
                 # Diagnostics on the flattened global-view embeddings.
@@ -333,30 +333,30 @@ def train(
                 len(results['accuracies']),
             )
 
-        logging.info('Final evaluation (repeat=%d)', eval_repeat)
-        embeddings = compute_node_embeddings(
-            encoder,
-            full_data,
-            rwse=cache.full_rwse,
-            se=cache.full_se,
-            device=model_args.device,
-        )
-        results = evaluate(
-            embeddings,
-            full_data,
-            repeat=eval_repeat,
-            data_random_seed=meta_args.global_seed,
-            dataset=data_args.data_name,
-            full_eval=True,
-        )
-        logging.info(
-            'FINAL step=%d prob[%s] acc=%.4f +/- %4.f over %d splits',
-            step,
-            results['probe_type'],
-            results['mean'],
-            results['std'],
-            len(results['accuracies']),
-        )
+    logging.info('Final evaluation (repeat=%d)', eval_repeat)
+    embeddings = compute_node_embeddings(
+        encoder,
+        full_data,
+        rwse=cache.full_rwse,
+        se=cache.full_se,
+        device=model_args.device,
+    )
+    results = evaluate(
+        embeddings,
+        full_data,
+        repeat=eval_repeat,
+        data_random_seed=meta_args.global_seed,
+        dataset=data_args.data_name,
+        full_eval=True,
+    )
+    logging.info(
+        'FINAL step=%d prob[%s] acc=%.4f +/- %4.f over %d splits',
+        step,
+        results['probe_type'],
+        results['mean'],
+        results['std'],
+        len(results['accuracies']),
+    )
 
 
 def main() -> None:
