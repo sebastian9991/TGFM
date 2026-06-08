@@ -125,6 +125,7 @@ def evaluate(
     )
 
     if full_eval:
+        logging.info(f'Full Evaluation.')
         has_masks = (
             hasattr(full_data, 'train_mask')
             and hasattr(full_data, 'val_mask')
@@ -321,6 +322,7 @@ def train(
                 repeat=eval_repeat,
                 data_random_seed=meta_args.global_seed,
                 dataset=data_args.data_name,
+                full_eval=False,
             )
             logging.info(
                 'step=%d prob[%s] acc=%.4f +/- %4.f over %d splits',
