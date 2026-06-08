@@ -61,7 +61,7 @@ def build_local_views_metis(
     """
     # ClusterData internally uses METIS (via torch-sparse / pyg-lib).
     safe_cluster(data=data, num_parts=num_parts)
-    cluster_data = ClusterData(data, num_parts=num_parts, log=True)
+    cluster_data = ClusterData(data, num_parts=num_parts, log=False)
 
     views: List[Data] = []
     N = data.num_nodes
