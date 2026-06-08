@@ -7,7 +7,7 @@ from torch_geometric import datasets
 from torch_geometric.data import Data, InMemoryDataset
 from torch_geometric.loader import NeighborLoader
 from torch_geometric.transforms import BaseTransform, NormalizeFeatures
-from torch_geometric.utils import to_undirected
+from torch_geometric.utils import is_undirected, to_undirected
 
 from tgfm.views.prepare import PreparedSubgraph, compute_rwse, prepare_subgraph
 
@@ -144,6 +144,21 @@ class SubgraphPreparer:
             num_workers=num_workers,
         )
 
+        self._it: Optional[Iterator[Data]] = None
+
+    def _next_ego(self) -> Data:
+        if self._it is None:
+            self._it = iter(self.loader)
+        try:
+            ego = next(self._it)
+            ego.edge_index = to_undirected(ego.edge_index, num_nodes=ego.num_nodes)
+            return ego
+        except StopIteration:
+            self._it = iter(self.loader)
+            ego = next(self._it)
+            ego.edge_index = to_undirected(ego.edge_index, num_nodes=ego.num_nodes)
+            return ego
+
     def __iter__(self) -> Iterator[PreparedSubgraph]:
         for ego in self.loader:
             rwse_ego, se_ego = self.cache.slice(ego)
@@ -153,6 +168,11 @@ class SubgraphPreparer:
                 se=se_ego,
                 **self.prepare_kwargs,
             )
+            assert is_undirected(prep.source.edge_index) == True
+            for views in prep.global_views:
+                assert is_undirected(views.edge_index) == True
+            for views in prep.local_views:
+                assert is_undirected(views.edge_index) == True
             yield prep
 
     def sample_batch(self, batch_size: int) -> list[PreparedSubgraph]:
@@ -162,10 +182,10 @@ class SubgraphPreparer:
         iterator on each call (so you get fresh samples each step).
         """
         out: list[PreparedSubgraph] = []
-        it = iter(self)
         for _ in range(batch_size):
-            try:
-                out.append(next(it))
-            except StopIteration:
-                break
+            ego = self._next_ego()
+            rwse_ego, se_ego = self.cache.slice(ego)
+            out.append(
+                prepare_subgraph(ego, rwse=rwse_ego, se=se_ego, **self.prepare_kwargs)
+            )
         return out
