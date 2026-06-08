@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Optional
 
 import torch
+import torch_geometric.transforms as T
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from tqdm import tqdm
@@ -114,7 +115,10 @@ def train(
     assert isinstance(model_args, GraphGPSArguments)
 
     # 1. Load dataset
-    dataset = get_dataset(root=str(meta_args.root_dir), name=data_args.data_name)
+    transform = T.compose([T.NormalizeFeatures(), T.ToUndirected()])
+    dataset = get_dataset(
+        root=str(meta_args.root_dir), name=data_args.data_name, transform=transform
+    )
     full_data = dataset[0]
     logging.info(
         'Loaded %s: N=%d nodes, E=%d edges, in_dim=%d',
