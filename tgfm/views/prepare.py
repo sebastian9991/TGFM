@@ -28,6 +28,17 @@ class PreparedSubgraph:
     local_views: List[Data] = field(default_factory=list)
 
 
+def safe_cluster(data: Data, num_parts: int) -> None:
+    n = data.num_nodes
+
+    if n == 0:
+        raise ValueError('METIS called on empty subgraph (0 vertices)')
+    if num_parts > n:
+        raise ValueError(
+            f'num_parts={num_parts} > num_nodes={n}' f"(METIS: 'too many parts')"
+        )
+
+
 def compute_rwse(data: Data, K: int) -> Tensor:
     """Random Walk Structural Encoding of walk length K.
 
@@ -53,7 +64,8 @@ def build_local_views_metis(
     se (=se[V]) restricted to the local view's node set.
     """
     # ClusterData internally uses METIS (via torch-sparse / pyg-lib).
-    cluster_data = ClusterData(data, num_parts=num_parts, log=False)
+    safe_cluster(data=data, num_parts=num_parts)
+    cluster_data = ClusterData(data, num_parts=num_parts, log=True)
 
     views: List[Data] = []
     N = data.num_nodes
