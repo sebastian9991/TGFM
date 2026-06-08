@@ -11,12 +11,11 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import torch
-import torch_geometric.transforms as T
 from torch import Tensor
 from torch_geometric.data import Data
 from torch_geometric.loader import ClusterData  # METIS wrapper
-from torch_geometric.transforms import AddRandomWalkPE, BaseTransform
-from torch_geometric.utils import k_hop_subgraph, subgraph
+from torch_geometric.transforms import AddRandomWalkPE
+from torch_geometric.utils import k_hop_subgraph, subgraph, to_undirected
 
 
 @dataclass
@@ -54,7 +53,6 @@ def build_local_views_metis(
     num_parts: int,
     expand_hops: int = 1,
     se: Optional[Tensor] = None,
-    transform: Optional[BaseTransform] = None,
 ) -> List[Data]:
     """Partition `data` with METIS into `num_parts`, then 1-hop expand each part.
 
@@ -63,8 +61,6 @@ def build_local_views_metis(
     """
     # ClusterData internally uses METIS (via torch-sparse / pyg-lib).
     safe_cluster(data=data, num_parts=num_parts)
-    # metis_ei = to_undirected(data.edge_index, num_nodes=data.num_nodes)
-    # metis_data = Data(edge_index=metis_ei, num_nodes=data.num_nodes)
     cluster_data = ClusterData(data, num_parts=num_parts, log=False)
 
     views: List[Data] = []
@@ -95,13 +91,12 @@ def build_local_views_metis(
             num_nodes=N,
         )
 
+        sub_ei = to_undirected(edge_index=sub_ei)
         view = Data(
             x=data.x[sub_nodes],
             edge_index=sub_ei,
             pe=rwse[sub_nodes],
         )
-        if transform is not None:
-            view = transform(view)
         if se is not None:
             view.se = se[sub_nodes]
         if getattr(data, 'edge_attr', None) is not None:
@@ -122,7 +117,6 @@ def build_global_views(
     strategy: str = 'bfs',  # "bfs" | "rwr"
     rng: Optional[torch.Generator] = None,
     se: Optional[Tensor] = None,
-    transform: Optional[BaseTransform] = None,
 ) -> List[Data]:
     """Sample `num_views` large connected subsamples from `data`.
 
@@ -146,13 +140,12 @@ def build_global_views(
             raise ValueError(f'Unknown global view strategy: {strategy}')
 
         sub_ei, _ = subgraph(nodes, data.edge_index, relabel_nodes=True, num_nodes=N)
+        sub_ei = to_undirected(edge_index=sub_ei)
         view = Data(
             x=data.x[nodes],
             edge_index=sub_ei,
             pe=rwse[nodes],
         )
-        if transform is not None:
-            view = transform(view)
         if se is not None:
             view.se = se[nodes]
         views.append(view)
@@ -228,7 +221,6 @@ def prepare_subgraph(
     global_strategy: str = 'bfs',
     rwse: Optional[Tensor] = None,
     se: Optional[Tensor] = None,
-    transform_views: bool = False,
 ) -> PreparedSubgraph:
     """Prepare global+local views for one subgraph.
 
@@ -249,22 +241,9 @@ def prepare_subgraph(
         se:   Optional precomputed structural encoding (any shape (N, S)).
               Stored on every view's Data as `data.se` for the encoder's SE
               branch. Same slicing caveat as `rwse`.
-        transform_views: bool. Choose whether to default transform found in torch_geometric.transform. By default we use
-                   ToUndirected(), AddSelfLoops(), RemoveIsolatedNodes().
     """
     if rwse is None:
         rwse = compute_rwse(data, K=K)
-
-    if transform_views:
-        transform = T.Compose(
-            [
-                T.AddSelfLoops(),
-                T.RemoveIsolatedNodes(),
-                T.ToUndirected(),
-            ]
-        )
-    else:
-        transform = None
 
     locals_ = build_local_views_metis(
         data,
@@ -272,7 +251,6 @@ def prepare_subgraph(
         num_parts=num_local_parts,
         expand_hops=1,
         se=se,
-        transform=transform,
     )
     globals_ = build_global_views(
         data,
@@ -281,7 +259,6 @@ def prepare_subgraph(
         coverage_frac=global_coverage_frac,
         strategy=global_strategy,
         se=se,
-        transform=transform,
     )
     return PreparedSubgraph(
         source=data, rwse=rwse, global_views=globals_, local_views=locals_
