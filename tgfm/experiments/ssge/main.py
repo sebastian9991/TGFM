@@ -47,6 +47,7 @@ from tgfm.utils.args import (
     DataArguments,
     MetaArguments,
     ModelArguments,
+    SSGEArguments,
     parse_args,
 )
 from tgfm.utils.diagnostics import collapse_diagnostics
@@ -131,6 +132,7 @@ def run_eval(
     meta_args: MetaArguments,
     which: str,
 ) -> None:
+    assert isinstance(model_args, SSGEArguments)
     if which == 'paper':
         from tgfm.dataset.evaluation import ssge_eval
 
@@ -175,6 +177,7 @@ def train(
     save_dir: Path,
     eval_mode: str = 'yours',
 ) -> None:
+    assert isinstance(model_args, SSGEArguments)
     device = model_args.device
 
     dataset = get_dataset(root=str(meta_args.root_dir), name=data_args.data_name)
