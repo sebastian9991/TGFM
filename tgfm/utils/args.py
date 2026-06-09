@@ -81,6 +81,10 @@ class DataArguments:
         metadata={'help': 'Number of test splits to do for uncertainty estimates.'},
         default=1,
     )
+    transform: bool = field(
+        default=False,
+        metadata={'help': 'Whether to transform dataset.'},
+    )
 
 
 @dataclass
