@@ -157,35 +157,3 @@ class GAT(nn.Module):
             return out, hidden_cat
         else:
             return out
-
-
-if __name__ == '__main__':
-    # Model configuration
-    model = GAT(
-        in_dim=128,
-        hidden_dim=256,
-        out_dim=128,
-        num_layers=3,
-        nhead=8,
-        nhead_out=4,
-        feat_drop=0.1,
-        attn_drop=0.1,
-        negative_slope=0.2,
-        concat_out=False,
-    ).cuda()
-
-    # Example data
-    num_nodes = 10000
-    num_edges = 50000
-
-    x = torch.randn(num_nodes, 128).cuda()
-    edge_index = torch.randint(0, num_nodes, (2, num_edges)).cuda()
-
-    # Forward pass
-    out = model(x, edge_index)
-    print(f'Output shape: {out.shape}')  # [10000, 128]
-
-    # With hidden states
-    out, hidden = model(x, edge_index, return_hidden=True)
-    print(f'Output shape: {out.shape}')
-    print(f'Hidden states shape: {hidden.shape}')
