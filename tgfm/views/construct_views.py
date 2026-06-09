@@ -7,6 +7,7 @@ from torch import Tensor
 from torch_geometric.data import Batch, Data
 from torch_geometric.utils import scatter
 
+from tgfm.models.ssge.ssge import GCNEncoder
 from tgfm.views.prepare import PreparedSubgraph
 
 
@@ -33,14 +34,20 @@ def embed_views_batched(
     se = getattr(batch, 'se', None)
     edge_attr = getattr(batch, 'edge_attr', None)
 
-    h = encoder(
-        x=batch.x,
-        pe=pe,
-        se=se,
-        edge_index=batch.edge_index,
-        batch=batch.batch,
-        edge_attr=edge_attr,
-    )  # (sum_N, d)
+    if isinstance(encoder, GCNEncoder):
+        h = encoder(
+            x=batch.x,
+            edge_inex=batch.edge_index,
+        )
+    else:
+        h = encoder(
+            x=batch.x,
+            pe=pe,
+            se=se,
+            edge_index=batch.edge_index,
+            batch=batch.batch,
+            edge_attr=edge_attr,
+        )  # (sum_N, d)
 
     # Mean-pool per view (= per graph in this Batch).
     # TODO: Check this mean-pooling methods correctness.
