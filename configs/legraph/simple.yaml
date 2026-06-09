@@ -20,6 +20,8 @@ ExperimentArguments:
         eval_frequency: 0
         eval_repeat: 10
         log_frequency: 10
+        num_local_parts: 8
+        num_local_as_global: 2
       data_args:
         data_name: 'cora'
         task_name: ""
