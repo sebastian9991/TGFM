@@ -14,7 +14,7 @@ Key changes vs. original:
      Equivalent math, lower peak activation memory.
   6. Optional gradient checkpointing on the LM (toggle via args).
 
-@article{he2025unigraph, ...}
+@article{he2025unigraph}
 """
 
 from typing import Iterator, Tuple

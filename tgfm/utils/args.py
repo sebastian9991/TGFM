@@ -71,6 +71,9 @@ class MetaArguments:
 class DataArguments:
     """Configuration of task-level data and problem settings."""
 
+    data_name: str = field(
+        metadata={'help': 'The name of the dataset, needed for pre-built datasets.'},
+    )
     task_name: str = field(
         metadata={'help': 'The name of the task to train on'},
     )
@@ -92,11 +95,22 @@ class ModelArguments:
     weight_decay: float = field(
         default=2.36e-5, metadata={'help': 'Weight decay on the optimizer.'}
     )
+    batch_size: int = field(default=32)
+    num_steps: int = field(
+        default=100, metadata={'help': 'The number of steps of training.'}
+    )
     epochs: int = field(default=100, metadata={'help': 'Number of epochs.'})
     runs: int = field(default=3, metadata={'help': 'Number of trials.'})
     patience: int = field(
         default=10,
         metadata={'help': 'Number of epochs to wait before no validation improvement.'},
+    )
+    eval_frequency: int = field(
+        default=500, metadata={'help': 'The frequency of evaluation.'}
+    )
+    eval_repeat: int = field(default=1, metadata={'help': 'The repeats of evaluation.'})
+    log_frequency: int = field(
+        default=10, metadata={'help': 'The frequency of logging.'}
     )
     use_cuda: bool = field(default=True, metadata={'help': 'Whether to use cuda.'})
     device: int = field(default=0, metadata={'help': 'Device to be used.'})
@@ -118,11 +132,46 @@ class UnigraphArguments(ModelArguments):
     norm: str = field(default='layernorm')
     gradient_checkpointing: bool = field(default=False)
     negative_slope: float = field(default=0.2)
-    batch_size: int = field(default=32)
     mask_rate: float = field(default=0.15)
     lam: float = field(default=0.1)
     momentum: float = field(default=0.996)
     delayed_ema_epoch: int = field(default=10)
+
+
+@dataclass
+class GraphGPSArguments(ModelArguments):
+    """Configuration of model architecture and training hyperparameters."""
+
+    model: str = 'GraphGPS'
+    dim: int = field(default=128)
+    num_layers: int = field(default=4)
+    num_heads: int = field(default=4)
+    local_gnn_type: str = field(default='GINE')
+    attn_type: str = field(
+        default='multihead'
+    )  # PyG GPSConv: "multihead" | "performer"
+    norm: str = field(default='batch_norm')  # PyG GPSConv internal norm
+
+    # Will sum to dim, asserted in graphGPS
+    node_out_dim: int = field(default=96)
+    pe_out_dim: int = field(default=32)
+    se_out_dim: int = field(default=0)
+
+    num_neighbors: list[int] = field(
+        default_factory=lambda: [-1],
+    )
+
+    rwse_K: int = field(default=16)  # K for RWSE
+
+    num_global_views: int = field(default=2)
+    num_local_parts: int = field(default=8)
+    global_coverage_frac: float = field(default=0.7)
+    global_strategy: str = field(default='bfs')
+
+    lambd: float = field(default=0.05)
+    num_slices: int = field(default=256)
+    centroid: str = field(default='global')  # "global" | "all"
+    centroid_stop_grad: bool = field(default=True)
 
 
 @dataclass
@@ -166,6 +215,7 @@ class ExperimentArguments:
 
 MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'Unigraph': UnigraphArguments,
+    'GraphGPS': GraphGPSArguments,
 }
 
 
