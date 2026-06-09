@@ -91,7 +91,6 @@ def build_local_views_metis(
             num_nodes=N,
         )
 
-        sub_ei = to_undirected(edge_index=sub_ei)
         view = Data(
             x=data.x[sub_nodes],
             edge_index=sub_ei,
