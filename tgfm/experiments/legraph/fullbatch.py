@@ -281,6 +281,7 @@ def train(
             V_l=V_l,
             edge_drop_rate=model_args.edge_drop_rate,
             feat_mask_rate=model_args.feat_mask_rate,
+            augment_views=True,  # TODO: paramaterize this
         )
 
         out = loss_fn(z_global, z_local)
