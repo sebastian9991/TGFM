@@ -37,7 +37,6 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch_geometric.data import Data
 from tqdm import tqdm
 
@@ -47,7 +46,7 @@ from tgfm.dataset.evaluation.linear_prob_pyg import (
 )
 from tgfm.dataset.pyg.data import get_dataset
 from tgfm.models.leJepa_loss import LeJEPALoss
-from tgfm.models.ssge.ssge import build_encoder
+from tgfm.models.mpnn import build_encoder
 from tgfm.utils.args import (
     DataArguments,
     MetaArguments,
@@ -251,9 +250,9 @@ def train(
     )
 
     # Recommended from LeJEPA paper.
-    scheduler = CosineAnnealingWarmRestarts(
-        optimizer=optim, T_0=20
-    )  # TODO: Paramaterize this.
+    # scheduler = CosineAnnealingWarmRestarts(
+    #     optimizer=optim, T_0=20
+    # )  # TODO: Paramaterize this.
 
     logging.info(
         'Encoder params: %.2fM',
@@ -270,7 +269,6 @@ def train(
         )
         global_views, local_views, B, V_g, V_l = flatten_views([prepared_graph])
 
-        # Move all views to the encoder's device.
         global_views = [g.to(device) for g in global_views]
         local_views = [l.to(device) for l in local_views]
 
@@ -281,6 +279,8 @@ def train(
             B=B,
             V_g=V_g,
             V_l=V_l,
+            edge_drop_rate=model_args.edge_drop_rate,
+            feat_mask_rate=model_args.feat_mask_rate,
         )
 
         out = loss_fn(z_global, z_local)
@@ -290,7 +290,7 @@ def train(
         )  # Is set to none correct here? Should it be set to zero by default?
         out.total.backward()
         optim.step()
-        scheduler.step()
+        # scheduler.step()
 
         if out.total < best_loss:
             save_checkpoint(
