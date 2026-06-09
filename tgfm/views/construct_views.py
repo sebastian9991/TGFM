@@ -47,8 +47,8 @@ def embed_views_batched(
                 batch.x, batch.edge_index, edge_drop_rate, feat_mask_rate
             )
         h = encoder(
-            x=batch.x,
-            edge_index=batch.edge_index,
+            x=x,
+            edge_index=edge_index,
         )
     else:
         h = encoder(
