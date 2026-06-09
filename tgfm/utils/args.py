@@ -180,6 +180,23 @@ class GraphGPSArguments(ModelArguments):
 
 
 @dataclass
+class SSGEArguments(ModelArguments):
+    """SSGE Configuration of model architecture and training hyperparameters."""
+
+    model: str = 'SSGE'
+    # pretraining
+    lam: float = 0.1  # uniformity weight
+    edge_drop_rate: float = 0.3  # p_d
+    feat_mask_rate: float = 0.1  # p_m
+    hid_dims: list = field(default_factory=lambda: [256, 256])
+    encoder: str = 'gcn'  # 'gcn' or 'mlp' (CoauthorCS)
+
+    # probe (paper eval)
+    lr2: float = 1e-2
+    wd2: float = 1e-4
+
+
+@dataclass
 class ExperimentArgument:
     """Container for a single experiment's data and model configuration."""
 
