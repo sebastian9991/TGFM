@@ -185,15 +185,15 @@ class SSGEArguments(ModelArguments):
 
     model: str = 'SSGE'
     # pretraining
-    lam: float = 0.1  # uniformity weight
-    edge_drop_rate: float = 0.3  # p_d
-    feat_mask_rate: float = 0.1  # p_m
+    lam: float = field(default=0.1)  # uniformity weight
+    edge_drop_rate: float = field(default=0.3)  # p_d
+    feat_mask_rate: float = field(default=0.1)  # p_m
     hid_dims: list = field(default_factory=lambda: [256, 256])
-    encoder: str = 'gcn'  # 'gcn' or 'mlp' (CoauthorCS)
+    encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
 
     # probe (paper eval)
-    lr2: float = 1e-2
-    wd2: float = 1e-4
+    lr2: float = field(default=1e-2)
+    wd2: float = field(default=1e-4)
 
 
 @dataclass
@@ -238,6 +238,7 @@ class ExperimentArguments:
 MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'Unigraph': UnigraphArguments,
     'GraphGPS': GraphGPSArguments,
+    'SSGE': SSGEArguments,
 }
 
 
