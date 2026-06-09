@@ -239,12 +239,12 @@ def train(
         hid_dims=model_args.hid_dims,
         kind=model_args.encoder,
         act_fn=F.elu,
-    )
+    ).to(device)
 
     loss_fn = LeJEPALoss(
         lambd=model_args.lambd,
         num_slices=model_args.num_slices,
-    ).to(model_args.device)
+    ).to(device)
 
     optim = AdamW(
         encoder.parameters(), lr=model_args.lr, weight_decay=model_args.weight_decay
@@ -271,8 +271,8 @@ def train(
         global_views, local_views, B, V_g, V_l = flatten_views([prepared_graph])
 
         # Move all views to the encoder's device.
-        global_views = [g.to(model_args.device) for g in global_views]
-        local_views = [l.to(model_args.device) for l in local_views]
+        global_views = [g.to(device) for g in global_views]
+        local_views = [l.to(device) for l in local_views]
 
         z_global, z_local = build_views(
             encoder=encoder,
