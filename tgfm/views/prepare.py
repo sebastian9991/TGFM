@@ -53,6 +53,7 @@ def build_local_views_metis(
     num_parts: int,
     expand_hops: int = 1,
     se: Optional[Tensor] = None,
+    directed: bool = False,
 ) -> List[Data]:
     """Partition `data` with METIS into `num_parts`, then 1-hop expand each part.
 
@@ -87,7 +88,7 @@ def build_local_views_metis(
         part_nodes = perm[start:end].to(device)  # original node ids in this part
 
         # k_hop_subgraph expands the seed set by `num_hops`.
-        sub_nodes, sub_ei, _, _ = k_hop_subgraph(
+        sub_nodes, _, _, _ = k_hop_subgraph(
             part_nodes,
             num_hops=expand_hops,
             edge_index=undirected_ei,
@@ -95,7 +96,8 @@ def build_local_views_metis(
             num_nodes=N,
         )
 
-        sub_ei = to_undirected(edge_index=sub_ei)
+        view_ei = data.edge_index if directed else undirected_ei
+        sub_ei, _ = subgraph(sub_nodes, view_ei, relabel_nodes=True, num_nodes=N)
         view = Data(
             x=data.x[sub_nodes],
             edge_index=sub_ei,
@@ -144,7 +146,6 @@ def build_global_views(
             raise ValueError(f'Unknown global view strategy: {strategy}')
 
         sub_ei, _ = subgraph(nodes, data.edge_index, relabel_nodes=True, num_nodes=N)
-        sub_ei = to_undirected(edge_index=sub_ei)
         view = Data(
             x=data.x[nodes],
             edge_index=sub_ei,
