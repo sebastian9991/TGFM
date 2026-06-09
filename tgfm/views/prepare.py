@@ -61,7 +61,11 @@ def build_local_views_metis(
     """
     # ClusterData internally uses METIS (via torch-sparse / pyg-lib).
     safe_cluster(data=data, num_parts=num_parts)
-    cluster_data = ClusterData(data, num_parts=num_parts, log=False)
+    N = data.num_nodes
+    # METIS requires an undirected graph avoids segumentation faults.
+    undirected_ei = to_undirected(data.edge_index, num_nodes=N)
+    metis_data = Data(edge_index=undirected_ei, num_nodes=N)
+    cluster_data = ClusterData(metis_data, num_parts=num_parts, log=False)
 
     views: List[Data] = []
     N = data.num_nodes
@@ -86,8 +90,8 @@ def build_local_views_metis(
         sub_nodes, sub_ei, _, _ = k_hop_subgraph(
             part_nodes,
             num_hops=expand_hops,
-            edge_index=data.edge_index,
-            relabel_nodes=True,
+            edge_index=undirected_ei,
+            relabel_nodes=False,
             num_nodes=N,
         )
 
