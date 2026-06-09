@@ -7,13 +7,17 @@ from torch import Tensor
 from torch_geometric.data import Batch, Data
 from torch_geometric.utils import scatter
 
-from tgfm.models.ssge.ssge import GCNEncoder
+from tgfm.models.mpnn import GCNEncoder
+from tgfm.views.augmentations import augment
 from tgfm.views.prepare import PreparedSubgraph
 
 
 def embed_views_batched(
     encoder: torch.nn.Module,
     views: List[Data],
+    edge_drop_rate: float,
+    feat_mask_rate: float,
+    augment_views: bool = False,
 ) -> Tensor:
     """Encode a list of view-Data objects and mean-pool each to a single vector.
 
@@ -22,6 +26,9 @@ def embed_views_batched(
         views:   list of length N_views, each a PyG Data with x, edge_index,
                  and optionally `pe` and/or `se` attributes carrying the
                  precomputed positional/structural encodings.
+        edge_drop_rate: Drop rate for adjacency matrix augmentation.
+        feat_mask_rate: Masking rate for feature augmentation.
+        augment_views: Whether to augment the views.
 
     Returns:
         z: (N_views, d)
@@ -35,6 +42,10 @@ def embed_views_batched(
     edge_attr = getattr(batch, 'edge_attr', None)
 
     if isinstance(encoder, GCNEncoder):
+        if augment_views:
+            x, edge_index = augment(
+                batch.x, batch.edge_index, edge_drop_rate, feat_mask_rate
+            )
         h = encoder(
             x=batch.x,
             edge_index=batch.edge_index,
@@ -62,6 +73,9 @@ def build_views(
     B: int,
     V_g: int,
     V_l: int,
+    edge_drop_rate: float,
+    feat_mask_rate: float,
+    augment_views: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """Encode all global+local views and reshape to (B, V_g, d), (B, V_l, d).
 
@@ -73,7 +87,9 @@ def build_views(
 
     # Encode in one combined forward to keep BN/attention stats consistent.
     all_views = global_views + local_views
-    z_all = embed_views_batched(encoder, all_views)  # (B*(V_g+V_l), d)
+    z_all = embed_views_batched(
+        encoder, all_views, edge_drop_rate, feat_mask_rate, augment_views
+    )  # (B*(V_g+V_l), d)
     d = z_all.size(-1)
 
     z_global = z_all[: B * V_g].view(B, V_g, d)
