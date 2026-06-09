@@ -143,6 +143,36 @@ class UnigraphArguments(ModelArguments):
 
 
 @dataclass
+class SimpleMPNN(ModelArguments):
+    """Configuration of model architecture and training hyperparameters."""
+
+    model: str = 'SimpleMPNN'
+    # pretraining
+    lam: float = field(default=0.1)  # uniformity weight
+    edge_drop_rate: float = field(default=0.3)  # p_d
+    feat_mask_rate: float = field(default=0.1)  # p_m
+    hid_dims: list = field(default_factory=lambda: [256, 256])
+    encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
+
+    rwse_K: int = field(default=16)  # K for RWSE
+
+    num_global_views: int = field(default=2)
+    num_local_parts: int = field(default=8)
+    global_coverage_frac: float = field(default=0.7)
+    global_strategy: str = field(default='bfs')
+    num_local_as_global: int = field(default=0)
+
+    lambd: float = field(default=0.05)
+    num_slices: int = field(default=256)
+    centroid: str = field(default='global')  # "global" | "all"
+    centroid_stop_grad: bool = field(default=True)
+
+    # probe (paper eval)
+    lr2: float = field(default=1e-2)
+    wd2: float = field(default=1e-4)
+
+
+@dataclass
 class GraphGPSArguments(ModelArguments):
     """Configuration of model architecture and training hyperparameters."""
 
@@ -239,6 +269,7 @@ MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'Unigraph': UnigraphArguments,
     'GraphGPS': GraphGPSArguments,
     'SSGE': SSGEArguments,
+    'SimpleMPNN': SimpleMPNN,
 }
 
 
