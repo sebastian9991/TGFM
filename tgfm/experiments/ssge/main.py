@@ -51,7 +51,7 @@ from tgfm.utils.args import (
     parse_args,
 )
 from tgfm.utils.diagnostics import collapse_diagnostics
-from tgfm.utils.logging import setup_logging
+from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.seed import seed_everything
 from tgfm.views.ssge.ssge_augments import augment
