@@ -34,7 +34,6 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-import torch_geometric.transforms as T
 from torch import Tensor
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
@@ -150,21 +149,19 @@ def train(
     assert isinstance(model_args, GraphGPSArguments)
 
     # 1. Load dataset
-    transform = T.Compose(
-        [
-            T.NormalizeFeatures(),
-            T.ToUndirected(),
-            T.AddSelfLoops(),
-            T.RemoveIsolatedNodes(),
-        ]
-    )
-    dataset = get_dataset(
-        root=str(meta_args.root_dir), name=data_args.data_name, transform=transform
-    )
+    # transform = T.Compose(
+    #     [
+    #         T.NormalizeFeatures(),
+    #         T.ToUndirected(),
+    #         T.AddSelfLoops(),
+    #         T.RemoveIsolatedNodes(),
+    #     ]
+    # )
+    dataset = get_dataset(root=str(meta_args.root_dir), name=data_args.data_name)
     full_data = dataset[0]
-    assert full_data.has_isolated_nodes() == False
-    assert full_data.has_self_loops() == True
-    assert full_data.is_directed() == False
+    # assert full_data.has_isolated_nodes() == False
+    # assert full_data.has_self_loops() == True
+    # assert full_data.is_directed() == False
     logging.info(
         'Loaded %s: N=%d nodes, E=%d edges, in_dim=%d',
         data_args.data_name,
