@@ -37,7 +37,7 @@ def embed_views_batched(
     if isinstance(encoder, GCNEncoder):
         h = encoder(
             x=batch.x,
-            edge_inex=batch.edge_index,
+            edge_index=batch.edge_index,
         )
     else:
         h = encoder(
