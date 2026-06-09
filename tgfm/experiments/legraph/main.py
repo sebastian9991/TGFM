@@ -191,6 +191,7 @@ def train(
             num_global_views=model_args.num_global_views,
             global_coverage_frac=model_args.global_coverage_frac,
             global_strategy=model_args.global_strategy,
+            num_local_as_global=model_args.num_local_as_global,
         ),
     )
     logging.info('Streaming preparer loaded.')
