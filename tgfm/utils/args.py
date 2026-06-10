@@ -164,8 +164,6 @@ class SimpleMPNN(ModelArguments):
 
     lambd: float = field(default=0.05)
     num_slices: int = field(default=256)
-    centroid: str = field(default='global')  # "global" | "all"
-    centroid_stop_grad: bool = field(default=True)
 
     # probe (paper eval)
     lr2: float = field(default=1e-2)
@@ -205,8 +203,6 @@ class GraphGPSArguments(ModelArguments):
 
     lambd: float = field(default=0.05)
     num_slices: int = field(default=256)
-    centroid: str = field(default='global')  # "global" | "all"
-    centroid_stop_grad: bool = field(default=True)
 
 
 @dataclass
