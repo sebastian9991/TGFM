@@ -200,7 +200,9 @@ def train(
         act_fn=F.elu,
     ).to(device)
     # loss_fn = SSGELoss(lambd=model_args.lam, normalize=True).to(device)
-    loss_fn = LeJEPALoss(lambd=model_args.lam).to(device)
+    loss_fn = LeJEPALoss(lambd=model_args.lam, num_slices=model_args.num_slices).to(
+        device
+    )
     optim = Adam(
         encoder.parameters(), lr=model_args.lr, weight_decay=model_args.weight_decay
     )
