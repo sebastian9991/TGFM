@@ -65,6 +65,7 @@ class LeJEPALoss(nn.Module):
         num_slices: int = 256,
         integration_points: int = 17,
         t_max: float = 3.0,
+        beta: bool = True,
     ):
         super().__init__()
         self.lambd = lambd
@@ -72,6 +73,7 @@ class LeJEPALoss(nn.Module):
         self.sigreg = SlicingUnivariateTest(
             univariate_test=univariate_test, num_slices=num_slices, reduction='mean'
         )
+        self.beta = beta
 
     def forward(
         self,
@@ -102,7 +104,10 @@ class LeJEPALoss(nn.Module):
             sigreg_loss = sigreg_loss + self.sigreg(embeddings_v)
         sigreg_loss = sigreg_loss / V
 
-        total = (1.0 - self.lambd) * pred_loss + self.lambd * sigreg_loss
+        if self.beta:
+            total = pred_loss + self.lambd * sigreg_loss
+        else:
+            total = (1.0 - self.lambd) * pred_loss + self.lambd * sigreg_loss
         return LeJEPALossOutput(
             total=total, pred=pred_loss.detach(), sigreg=sigreg_loss.detach()
         )
