@@ -42,7 +42,8 @@ from torch_geometric.data import Data
 from tqdm import tqdm
 
 from tgfm.dataset.pyg.data import get_dataset
-from tgfm.models.ssge.ssge import SSGELoss, build_encoder
+from tgfm.models.mpnn import build_encoder
+from tgfm.models.ssge.ssge import SSGELoss
 from tgfm.utils.args import (
     DataArguments,
     MetaArguments,
@@ -54,7 +55,7 @@ from tgfm.utils.diagnostics import collapse_diagnostics
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.seed import seed_everything
-from tgfm.views.ssge.ssge_augments import augment
+from tgfm.views.augmentations import augment
 
 parser = argparse.ArgumentParser(
     description='SSGE pretraining.',
@@ -150,7 +151,6 @@ def run_eval(
             embeddings, full_data.y, n_repeats=model_args.eval_repeat
         )
     else:
-        # Your pipeline. Matches the call in your main.py.
         from tgfm.dataset.evaluation.linear_prob_pyg import (
             evaluate_linear_probe,
         )
