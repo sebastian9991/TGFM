@@ -67,6 +67,14 @@ parser.add_argument(
 parser.add_argument('--eval', type=str, default='yours', choices=['yours', 'paper'])
 
 
+def batch_normalize(z: Tensor) -> Tensor:
+    """Per-dimension standardization across the node (batch) axis.
+
+    ``(z - mean) / std`` with unbiased std, exactly as in the reference.
+    """
+    return (z - z.mean(0)) / z.std(0)
+
+
 def save_checkpoint(
     path: Path,
     epoch: int,
@@ -227,6 +235,10 @@ def train(
 
         z1 = encoder(x1, ei1)
         z2 = encoder(x2, ei2)
+
+        # Try batch normalization as per SSGE paper:
+        z1 = batch_normalize(z1)
+        z2 = batch_normalize(z2)
 
         # z_global = z1.view(-1, 1, z1.shape[1])
         z_global = torch.stack([z1, z2], dim=1)  # (N, 2, d)
