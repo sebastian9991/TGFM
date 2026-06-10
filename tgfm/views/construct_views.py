@@ -36,21 +36,34 @@ def embed_views_batched(
     if len(views) == 0:
         raise ValueError('embed_views_batched got an empty list of views.')
 
-    batch = Batch.from_data_list(views)
-    pe = getattr(batch, 'pe', None)
-    se = getattr(batch, 'se', None)
-    edge_attr = getattr(batch, 'edge_attr', None)
-
     if isinstance(encoder, GCNEncoder):
         if augment_views:
-            x, edge_index = augment(
-                batch.x, batch.edge_index, edge_drop_rate, feat_mask_rate
+            aug = []
+            for v in views:
+                x_v, ei_v = augment(v.x, v.edge_index, edge_drop_rate, feat_mask_rate)
+                augmented_view = Data(x=x_v, edge_index=ei_v)
+                if getattr(v, 'pe', None) is not None:
+                    augmented_view.pe = v.pe
+                if getattr(v, 'se', None) is not None:
+                    augmented_view.se = v.se
+                aug.append(augmented_view)
+                views = aug
+            batch = Batch.from_data_list(views)
+            h = encoder(
+                x=batch.x,
+                edge_index=batch.edge_index,
             )
-        h = encoder(
-            x=x,
-            edge_index=edge_index,
-        )
+        else:
+            batch = Batch.from_data_list(views)
+            h = encoder(
+                x=batch.x,
+                edge_index=batch.edge_index,
+            )
     else:
+        batch = Batch.from_data_list(views)
+        pe = getattr(batch, 'pe', None)
+        se = getattr(batch, 'se', None)
+        edge_attr = getattr(batch, 'edge_attr', None)
         h = encoder(
             x=batch.x,
             pe=pe,
@@ -64,6 +77,49 @@ def embed_views_batched(
     # TODO: Check this mean-pooling methods correctness.
     z = scatter(h, batch.batch, dim=0, reduce='mean')  # (N_views, d)
     return z
+
+
+def _augment_view(v: Data, edge_drop_rate: float, feat_mask_rate: float) -> Data:
+    x_v, ei_v = augment(v.x, v.edge_index, edge_drop_rate, feat_mask_rate)
+    nv = Data(x=x_v, edge_index=ei_v)
+    nv.n_id = v.n_id  # node set/order unchanged by augment
+    if getattr(v, 'pe', None) is not None:
+        nv.pe = v.pe
+    if getattr(v, 'se', None) is not None:
+        nv.se = v.se
+    return nv
+
+
+def embed_views_nodelevel(
+    encoder: torch.nn.Module,
+    views: List[Data],
+    edge_drop_rate: float,
+    feat_mask_rate: float,
+    augment_views: bool = True,
+) -> Tuple[Tensor, Tensor, Tensor]:
+    """Encode views WITHOUT pooling. Each view augmented independently.
+
+    Returns:
+        h:       (M, d) per-node embeddings, M = total nodes across all views
+        node_id: (M,)   original node id per row
+        view_id: (M,)   which view each row came from
+    """
+    if augment_views and isinstance(encoder, GCNEncoder):
+        views = [_augment_view(v, edge_drop_rate, feat_mask_rate) for v in views]
+
+    batch = Batch.from_data_list(views)
+    h = encoder(x=batch.x, edge_index=batch.edge_index)  # (M, d) — no scatter/pool
+
+    device = h.device
+    node_id = torch.cat([v.n_id.to(device) for v in views])
+    view_id = torch.cat(
+        [
+            torch.full((v.num_nodes,), i, dtype=torch.long, device=device)
+            for i, v in enumerate(views)
+        ]
+    )
+    assert h.size(0) == node_id.size(0) == view_id.size(0)
+    return h, node_id, view_id
 
 
 def build_views(
