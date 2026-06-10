@@ -87,9 +87,12 @@ class LeJEPALoss(nn.Module):
         all_views = torch.cat([z_global, z_local], dim=1)  # (B, V, d)
         # (B, V, d) - (B, 1, d) -> squared L2 per view, averaged over batch & view.
         diff = all_views - mu.unsqueeze(1)
+        # pred_loss = (
+        #     (diff**2).sum(dim=-1).mean()
+        # )  # scalar, this will default to average over both dim=0,1
         pred_loss = (
-            (diff**2).sum(dim=-1).mean()
-        )  # scalar, this will default to average over both dim=0,1
+            diff.square().mean()
+        )  # mean over (B, v, d). According to Algorithm 2 of LeJEPA.
 
         # ---- SIGReg: per-view-position, averaged ----------------------------
         sigreg_loss = z_global.new_zeros(())
