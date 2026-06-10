@@ -82,8 +82,7 @@ class LeJEPALoss(nn.Module):
         _, V_l, _ = z_local.shape
         V = V_g + V_l
 
-        # TODO: Should we use detach here?
-        mu = z_global.mean(dim=1).detach()  # (B, d)
+        mu = z_global.mean(dim=1)  # (B, d)
 
         all_views = torch.cat([z_global, z_local], dim=1)  # (B, V, d)
         # (B, V, d) - (B, 1, d) -> squared L2 per view, averaged over batch & view.
