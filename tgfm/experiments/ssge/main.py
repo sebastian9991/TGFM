@@ -228,8 +228,10 @@ def train(
         z1 = encoder(x1, ei1)
         z2 = encoder(x2, ei2)
 
-        z_global = z1.view(-1, 1, z1.shape[1])
-        z_local = z2.view(-1, 1, z2.shape[1])
+        # z_global = z1.view(-1, 1, z1.shape[1])
+        z_global = torch.stack([z1, z2], dim=1)  # (N, 2, d)
+        # z_local = z2.view(-1, 1, z2.shape[1])
+        z_local = z1.new_empty(z1.size(0), 0, z1.size(1))
         out = loss_fn(z_global, z_local)
 
         optim.zero_grad(set_to_none=True)
