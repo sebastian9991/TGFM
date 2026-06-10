@@ -45,7 +45,7 @@ from tgfm.dataset.evaluation.linear_prob_pyg import (
     node_classification,
 )
 from tgfm.dataset.pyg.data import get_dataset
-from tgfm.models.leJepa_loss import LeJEPALoss
+from tgfm.models.leJepa_loss import NodeLevelLeJEPALoss
 from tgfm.models.mpnn import build_encoder
 from tgfm.utils.args import (
     DataArguments,
@@ -58,7 +58,7 @@ from tgfm.utils.diagnostics import collapse_diagnostics
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.seed import seed_everything
-from tgfm.views.construct_views import build_views, flatten_views
+from tgfm.views.construct_views import embed_views_nodelevel
 from tgfm.views.prepare import prepare_subgraph
 
 parser = argparse.ArgumentParser(
@@ -240,7 +240,7 @@ def train(
         act_fn=F.elu,
     ).to(device)
 
-    loss_fn = LeJEPALoss(
+    loss_fn = NodeLevelLeJEPALoss(
         lambd=model_args.lambd,
         num_slices=model_args.num_slices,
     ).to(device)
@@ -264,27 +264,42 @@ def train(
     best_loss: float = float('inf')
     for epoch in tqdm(range(model_args.epochs), desc='Training steps'):
         encoder.train()
-        prepared_graph = prepare_subgraph(
+        prepared = prepare_subgraph(
             data=full_data,
         )
-        global_views, local_views, B, V_g, V_l = flatten_views([prepared_graph])
-
-        global_views = [g.to(device) for g in global_views]
-        local_views = [l.to(device) for l in local_views]
-
-        z_global, z_local = build_views(
-            encoder=encoder,
-            global_views=global_views,
-            local_views=local_views,
-            B=B,
-            V_g=V_g,
-            V_l=V_l,
-            edge_drop_rate=model_args.edge_drop_rate,
-            feat_mask_rate=model_args.feat_mask_rate,
-            augment_views=True,  # TODO: paramaterize this
+        # global_views, local_views, B, V_g, V_l = flatten_views([prepared_graph])
+        #
+        # global_views = [g.to(device) for g in global_views]
+        # local_views = [l.to(device) for l in local_views]
+        #
+        # z_global, z_local = build_views(
+        #     encoder=encoder,
+        #     global_views=global_views,
+        #     local_views=local_views,
+        #     B=B,
+        #     V_g=V_g,
+        #     V_l=V_l,
+        #     edge_drop_rate=model_args.edge_drop_rate,
+        #     feat_mask_rate=model_args.feat_mask_rate,
+        #     augment_views=True,  # TODO: paramaterize this
+        # )
+        global_views = [g.to(device) for g in prepared.global_views]
+        local_views = [l.to(device) for l in prepared.local_views]
+        all_views = global_views + local_views
+        is_global = torch.tensor(
+            [True] * len(global_views) + [False] * len(local_views), device=device
         )
 
-        out = loss_fn(z_global, z_local)
+        h, node_id, view_id = embed_views_nodelevel(
+            encoder,
+            all_views,
+            edge_drop_rate=model_args.edge_drop_rate,
+            feat_mask_rate=model_args.feat_mask_rate,
+            augment_views=True,
+        )
+        out = loss_fn(
+            h, node_id, view_id, is_global
+        )  # loss_fn = NodeLevelLeJEPALoss(...)
 
         optim.zero_grad(
             set_to_none=True
@@ -308,9 +323,7 @@ def train(
             )
             if collapse_diagnostics is not None:
                 with torch.no_grad():
-                    stats = collapse_diagnostics(
-                        z_global.reshape(-1, z_global.size(-1))
-                    )
+                    stats = collapse_diagnostics(h.reshape(-1, h.size(-1)))
                 msg += (
                     f' | eff_rank={stats.eff_rank:.1f} trace={stats.trace_cov:.3f} '
                     f'var[min/mean/max]={stats.var_min:.3f}/{stats.var_mean:.3f}/{stats.var_max:.3f}'
