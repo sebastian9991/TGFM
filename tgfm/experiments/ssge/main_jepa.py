@@ -237,8 +237,9 @@ def train(
         z2 = encoder(x2, ei2)
 
         # Try batch normalization as per SSGE paper:
-        # z1 = batch_normalize(z1)
-        # z2 = batch_normalize(z2)
+        # TODO: Check if batch normalization was used in leJEPA. I think it was, in the Vit architectures.
+        z1 = batch_normalize(z1)
+        z2 = batch_normalize(z2)
 
         # z_global = z1.view(-1, 1, z1.shape[1])
         z_global = torch.stack([z1, z2], dim=1)  # (N, 2, d)
