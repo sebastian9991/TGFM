@@ -216,6 +216,7 @@ class SSGEArguments(ModelArguments):
     feat_mask_rate: float = field(default=0.1)  # p_m
     hid_dims: list = field(default_factory=lambda: [256, 256])
     encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
+    num_slices: int = field(default=256)
 
     # probe (paper eval)
     lr2: float = field(default=1e-2)
