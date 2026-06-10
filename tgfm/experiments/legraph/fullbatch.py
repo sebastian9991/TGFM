@@ -266,6 +266,8 @@ def train(
         encoder.train()
         prepared = prepare_subgraph(
             data=full_data,
+            global_strategy=model_args.global_strategy,
+            num_local_as_global=model_args.num_local_as_global,
         )
         # global_views, local_views, B, V_g, V_l = flatten_views([prepared_graph])
         #
