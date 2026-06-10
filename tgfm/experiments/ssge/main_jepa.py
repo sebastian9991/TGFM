@@ -42,8 +42,8 @@ from torch_geometric.data import Data
 from tqdm import tqdm
 
 from tgfm.dataset.pyg.data import get_dataset
+from tgfm.models.leJepa_loss import LeJEPALoss
 from tgfm.models.mpnn import build_encoder
-from tgfm.models.ssge.ssge import SSGELoss
 from tgfm.utils.args import (
     DataArguments,
     MetaArguments,
@@ -199,7 +199,10 @@ def train(
         kind=model_args.encoder,
         act_fn=F.elu,
     ).to(device)
-    loss_fn = SSGELoss(lambd=model_args.lam, normalize=True).to(device)
+    # loss_fn = SSGELoss(lambd=model_args.lam, normalize=True).to(device)
+    loss_fn = LeJEPALoss(lambd=model_args.lam, num_slices=model_args.num_slices).to(
+        device
+    )
     optim = Adam(
         encoder.parameters(), lr=model_args.lr, weight_decay=model_args.weight_decay
     )
@@ -225,7 +228,11 @@ def train(
         z1 = encoder(x1, ei1)
         z2 = encoder(x2, ei2)
 
-        out = loss_fn(z1, z2)
+        # z_global = z1.view(-1, 1, z1.shape[1])
+        z_global = torch.stack([z1, z2], dim=1)  # (N, 2, d)
+        # z_local = z2.view(-1, 1, z2.shape[1])
+        z_local = z1.new_empty(z1.size(0), 0, z1.size(1))
+        out = loss_fn(z_global, z_local)
 
         optim.zero_grad(set_to_none=True)
         out.total.backward()
