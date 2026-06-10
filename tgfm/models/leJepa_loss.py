@@ -29,6 +29,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch import Tensor
+from torch_geometric.utils import scatter
 
 from tgfm.models.multivariate.slicing import SlicingUnivariateTest
 from tgfm.models.multivariate.univariate import EppsPulley
@@ -81,7 +82,8 @@ class LeJEPALoss(nn.Module):
         _, V_l, _ = z_local.shape
         V = V_g + V_l
 
-        mu = z_global.mean(dim=1)  # (B, d)
+        # TODO: Should we use detach here?
+        mu = z_global.mean(dim=1).detach()  # (B, d)
 
         all_views = torch.cat([z_global, z_local], dim=1)  # (B, V, d)
         # (B, V, d) - (B, 1, d) -> squared L2 per view, averaged over batch & view.
@@ -102,3 +104,60 @@ class LeJEPALoss(nn.Module):
         return LeJEPALossOutput(
             total=total, pred=pred_loss.detach(), sigreg=sigreg_loss.detach()
         )
+
+
+class NodeLevelLeJEPALoss(nn.Module):
+    def __init__(
+        self,
+        lambd: float = 0.05,
+        num_slices: int = 256,
+        integration_points: int = 17,
+        t_max: float = 3.0,
+        normalize: bool = True,
+        min_nodes: int = 16,
+    ):
+        super().__init__()
+        self.lambd = lambd
+        self.normalize = normalize
+        self.min_nodes = min_nodes
+        ut = EppsPulley(t_max=t_max, n_points=integration_points)
+        self.sigreg = SlicingUnivariateTest(
+            univariate_test=ut, num_slices=num_slices, reduction='mean'
+        )
+
+    def forward(
+        self, h: Tensor, node_id: Tensor, view_id: Tensor, is_global_view: Tensor
+    ) -> LeJEPALossOutput:
+        # h:(M,d)  node_id:(M,)  view_id:(M,)  is_global_view:(num_views,) bool
+        num_views = int(view_id.max().item()) + 1
+
+        # (1) per-view batch-normalization (SSGE-style: standardize each view's block)
+        # This may not be required.
+        if self.normalize:
+            h = (h - h.mean(0)) / (h.std(0) + 1e-5)
+
+        # (2) SIGReg per view, over that view's node embeddings (many samples now)
+        sigreg, counted = h.new_zeros(()), 0
+        for v in range(num_views):
+            zv = h[view_id == v]  # (n_v, d)
+            if zv.size(0) < self.min_nodes:
+                continue
+            sigreg = sigreg + self.sigreg(zv) / zv.size(0)
+            counted += 1
+        sigreg = sigreg / max(counted, 1)
+
+        # (3) predictive: per-node centroid from GLOBAL views (detached target)
+        grow = is_global_view[view_id]  # (M,) bool
+        if grow.any():
+            g_h, g_id = h[grow], node_id[grow]
+            uniq, inv = torch.unique(g_id, return_inverse=True)
+            centroid = scatter(g_h, inv, dim=0, reduce='mean').detach()  # (U,d)
+            pos = torch.searchsorted(uniq, node_id).clamp(max=uniq.numel() - 1)
+            valid = uniq[pos] == node_id  # node seen in a global view
+            diff = (h - centroid[pos])[valid]
+            pred = (diff**2).sum(dim=-1).mean()
+        else:
+            pred = h.new_zeros(())
+
+        total = (1.0 - self.lambd) * pred + self.lambd * sigreg
+        return LeJEPALossOutput(total=total, pred=pred.detach(), sigreg=sigreg.detach())
