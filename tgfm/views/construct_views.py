@@ -36,31 +36,25 @@ def embed_views_batched(
     if len(views) == 0:
         raise ValueError('embed_views_batched got an empty list of views.')
 
+    if augment_views:
+        aug = []
+        for v in views:
+            x_v, ei_v = augment(v.x, v.edge_index, edge_drop_rate, feat_mask_rate)
+            augmented_view = Data(x=x_v, edge_index=ei_v)
+            if getattr(v, 'pe', None) is not None:
+                augmented_view.pe = v.pe
+            if getattr(v, 'se', None) is not None:
+                augmented_view.se = v.se
+            aug.append(augmented_view)
+        views = aug
+
+    batch = Batch.from_data_list(views)
     if isinstance(encoder, GCNEncoder):
-        if augment_views:
-            aug = []
-            for v in views:
-                x_v, ei_v = augment(v.x, v.edge_index, edge_drop_rate, feat_mask_rate)
-                augmented_view = Data(x=x_v, edge_index=ei_v)
-                if getattr(v, 'pe', None) is not None:
-                    augmented_view.pe = v.pe
-                if getattr(v, 'se', None) is not None:
-                    augmented_view.se = v.se
-                aug.append(augmented_view)
-                views = aug
-            batch = Batch.from_data_list(views)
-            h = encoder(
-                x=batch.x,
-                edge_index=batch.edge_index,
-            )
-        else:
-            batch = Batch.from_data_list(views)
-            h = encoder(
-                x=batch.x,
-                edge_index=batch.edge_index,
-            )
+        h = encoder(
+            x=batch.x,
+            edge_index=batch.edge_index,
+        )
     else:
-        batch = Batch.from_data_list(views)
         pe = getattr(batch, 'pe', None)
         se = getattr(batch, 'se', None)
         edge_attr = getattr(batch, 'edge_attr', None)
