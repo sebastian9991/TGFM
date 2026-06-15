@@ -53,10 +53,6 @@ class LeJEPALoss(nn.Module):
     Forward inputs:
         z_global: (B, V_g, d)
         z_local:  (B, V_l, d)
-
-    Notes:
-        - We detach the centroid from autograd to make the prediction loss a
-          pull-toward-target, not a pull-toward-each-other.
     """
 
     def __init__(
