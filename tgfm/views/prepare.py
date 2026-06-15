@@ -337,8 +337,12 @@ def prepare_subgraph(
     if global_strategy == 'local':
         if num_local_as_global > 0:
             k = min(num_local_as_global, len(locals_))
-            globals_ = locals_[:k]
-            locals_ = locals_[k:]
+            if k == len(locals_):
+                globals_ = locals_[:1]
+                locals_ = locals_[1:]
+            else:
+                globals_ = locals_[:k]
+                locals_ = locals_[k:]
         else:
             globals_ = build_global_views_from_local_union(
                 data,
