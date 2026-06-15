@@ -245,6 +245,7 @@ def train(
     best_loss: float = float('inf')
     assert cache.full_rwse is not None
     for step in tqdm(range(model_args.num_steps), desc='Training steps'):
+        encoder.train()
         batch = preparer.sample_batch(model_args.batch_size)
         if len(batch) < model_args.batch_size:
             logging.warning(
@@ -269,6 +270,9 @@ def train(
             B=B,
             V_g=V_g,
             V_l=V_l,
+            edge_drop_rate=model_args.edge_drop_rate,
+            feat_mask_rate=model_args.feat_mask_rate,
+            augment_views=True,
         )
 
         out = loss_fn(z_global, z_local)
