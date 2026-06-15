@@ -1,7 +1,6 @@
-"""Training loop for SSGE (Negative-Free Self-Supervised Gaussian Embedding).
+"""Training loop for SSGE w/ LeJEPA Epps-Pulley Statistic Test.
 
-Re-implemented to match the LeJEPA/LeGraph codebase conventions while staying
-faithful to https://github.com/Cloudy1225/SSGE.
+Re-implemented SSGE Implementation of https://github.com/Cloudy1225/SSGE.
 
 Key design points (contrast with the LeJEPA pretrainer):
     - Single shared encoder (GCN, or MLP for CoauthorCS). No EMA / teacher.
@@ -13,19 +12,12 @@ Key design points (contrast with the LeJEPA pretrainer):
       Returned as SSGEOutput(total, pred, sigreg) to match the LeJEPALoss API.
 
 Evaluation:
-    --eval yours  : use the repo's evaluate_linear_probe / node_classification
-                    (scores SSGE on *your* probe; recommended for baselining
+    --eval prob  : use evaluate_linear_probe / node_classification
+                    (scores SSGE on probe; recommended for baselining
                     SSGE against your own model under identical conditions).
-    --eval paper  : use tgfm.dataset.evaluation.ssge_eval (the paper's exact
+    --eval ssg_eval  : use tgfm.dataset.evaluation.ssge_eval (the ssg_eval's exact
                     LR-probe + clustering protocol; for reproducing their
                     reported numbers).
-
-Integration notes (verify against your actual signatures):
-    - get_dataset(root: str, name: str, transform=None) -> dataset; dataset[0]
-      is a PyG Data with .x, .y, .edge_index, .num_features and (for some
-      datasets) train/val/test masks.
-    - The "yours" eval path calls evaluate_linear_probe(embeddings, full_data,
-      repeat=, data_random_seed=) exactly as in your main.py.
 """
 
 import argparse
@@ -64,7 +56,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     '--config-file', type=str, required=True, help='Path to configuration file.'
 )
-parser.add_argument('--eval', type=str, default='yours', choices=['yours', 'paper'])
+parser.add_argument('--eval', type=str, default='prob', choices=['prob', 'ssg_eval'])
 
 
 def batch_normalize(z: Tensor) -> Tensor:
@@ -142,7 +134,7 @@ def run_eval(
     which: str,
 ) -> None:
     assert isinstance(model_args, SSGEArguments)
-    if which == 'paper':
+    if which == 'ssg_eval':
         from tgfm.dataset.evaluation import ssge_eval
 
         masks = get_masks(full_data, data_args.data_name)
@@ -183,7 +175,7 @@ def train(
     data_args: DataArguments,
     meta_args: MetaArguments,
     save_dir: Path,
-    eval_mode: str = 'yours',
+    eval_mode: str = 'prob',
 ) -> None:
     assert isinstance(model_args, SSGEArguments)
     device = model_args.device
@@ -207,7 +199,6 @@ def train(
         kind=model_args.encoder,
         act_fn=F.elu,
     ).to(device)
-    # loss_fn = SSGELoss(lambd=model_args.lam, normalize=True).to(device)
     loss_fn = LeJEPALoss(lambd=model_args.lam, num_slices=model_args.num_slices).to(
         device
     )
@@ -236,7 +227,7 @@ def train(
         z1 = encoder(x1, ei1)
         z2 = encoder(x2, ei2)
 
-        # Try batch normalization as per SSGE paper:
+        # Try batch normalization as per SSGE ssg_eval:
         # TODO: Check if batch normalization was used in leJEPA. I think it was, in the Vit architectures.
         z1 = batch_normalize(z1)
         z2 = batch_normalize(z2)
