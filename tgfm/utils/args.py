@@ -176,7 +176,7 @@ class GraphGPSArguments(ModelArguments):
 
     model: str = 'GraphGPS'
     dim: int = field(default=128)
-    num_layers: int = field(default=4)
+    num_layers: int = field(default=3)
     num_heads: int = field(default=4)
     local_gnn_type: str = field(default='GINE')
     attn_type: str = field(
