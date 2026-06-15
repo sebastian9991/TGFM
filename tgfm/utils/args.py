@@ -116,6 +116,8 @@ class ModelArguments:
     log_frequency: int = field(
         default=10, metadata={'help': 'The frequency of logging.'}
     )
+    edge_drop_rate: float = field(default=0.3)  # p_d
+    feat_mask_rate: float = field(default=0.1)  # p_m
     use_cuda: bool = field(default=True, metadata={'help': 'Whether to use cuda.'})
     device: int = field(default=0, metadata={'help': 'Device to be used.'})
 
@@ -149,8 +151,6 @@ class SimpleMPNN(ModelArguments):
     model: str = 'SimpleMPNN'
     # pretraining
     lam: float = field(default=0.1)  # uniformity weight
-    edge_drop_rate: float = field(default=0.3)  # p_d
-    feat_mask_rate: float = field(default=0.1)  # p_m
     hid_dims: list = field(default_factory=lambda: [256, 256])
     encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
 
@@ -212,8 +212,6 @@ class SSGEArguments(ModelArguments):
     model: str = 'SSGE'
     # pretraining
     lam: float = field(default=0.1)  # uniformity weight
-    edge_drop_rate: float = field(default=0.3)  # p_d
-    feat_mask_rate: float = field(default=0.1)  # p_m
     hid_dims: list = field(default_factory=lambda: [256, 256])
     encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
     num_slices: int = field(default=256)
