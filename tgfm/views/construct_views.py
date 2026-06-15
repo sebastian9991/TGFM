@@ -53,7 +53,7 @@ def embed_views_batched(
         h = encoder(
             x=batch.x,
             edge_index=batch.edge_index,
-        )
+        )  # (N_views, N_nodes, d)
     else:
         pe = getattr(batch, 'pe', None)
         se = getattr(batch, 'se', None)
@@ -65,7 +65,7 @@ def embed_views_batched(
             edge_index=batch.edge_index,
             batch=batch.batch,
             edge_attr=edge_attr,
-        )  # (sum_N, d)
+        )  # (N_views, N_nodes, d)
 
     # Mean-pool per view (= per graph in this Batch).
     # TODO: Check this mean-pooling methods correctness.
