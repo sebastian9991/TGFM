@@ -37,7 +37,6 @@ import torch
 import torch_geometric.transforms as T
 from torch import Tensor
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torch_geometric.data import Data
 from tqdm import tqdm
 
@@ -231,10 +230,10 @@ def train(
     )
 
     # Recommended from LeJEPA paper.
-    scheduler = CosineAnnealingWarmRestarts(
-        optimizer=optim, T_0=20
-    )  # TODO: Paramaterize this.
-
+    # scheduler = CosineAnnealingWarmRestarts(
+    #     optimizer=optim, T_0=20
+    # )  # TODO: Paramaterize this.
+    #
     logging.info(
         'Encoder params: %.2fM',
         sum(p.numel() for p in encoder.parameters()) / 1e6,
@@ -282,7 +281,7 @@ def train(
         )  # Is set to none correct here? Should it be set to zero by default?
         out.total.backward()
         optim.step()
-        scheduler.step()
+        # scheduler.step()
 
         if out.total < best_loss:
             save_checkpoint(
