@@ -116,7 +116,9 @@ class EppsPulley(UnivariateTest):
         self.register_buffer('t', t)
         dt = t_max / (n_points - 1)
         weights = torch.full((n_points,), 2 * dt, dtype=torch.float32)
-        weights[[0, -1]] = dt  # Half-weight at t=0
+        weights[[0, -1]] = (
+            dt  # Half-weight at t=0 EDIT: And t = n_points - 1? Is this because of the approximation to integration? Trapezoid?
+        )
         self.register_buffer('phi', self.t.square().mul_(0.5).neg_().exp_())
         self.register_buffer('weights', weights * self.phi)
 
