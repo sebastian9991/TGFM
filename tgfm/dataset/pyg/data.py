@@ -153,6 +153,8 @@ class SubgraphPreparer:
                 se=se_ego,
                 **self.prepare_kwargs,
             )
+            if prep.local_views == 0 or prep.global_views == 0:
+                continue
             yield prep
 
     def sample_batch(self, batch_size: int) -> list[PreparedSubgraph]:
