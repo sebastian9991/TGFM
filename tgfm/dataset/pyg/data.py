@@ -153,7 +153,7 @@ class SubgraphPreparer:
                 se=se_ego,
                 **self.prepare_kwargs,
             )
-            if prep.local_views == 0 or prep.global_views == 0:
+            if len(prep.local_views) == 0 or len(prep.global_views) == 0:
                 continue
             yield prep
 
