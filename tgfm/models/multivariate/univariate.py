@@ -101,7 +101,7 @@ class EppsPulley(UnivariateTest):
         t_max: float = 3,
         n_points: int = 17,
         integration: str = 'trapezoid',
-        scale: str = 'per_sample',
+        scale: str = 'statistic',
     ):
         super().__init__()
         assert n_points % 2 == 1
@@ -123,7 +123,7 @@ class EppsPulley(UnivariateTest):
         self.register_buffer('weights', weights * self.phi)
 
     def forward(self, x: Tensor) -> Tensor:
-        x.size(-2)
+        N = x.size(-2)
         # Compute cos/sin only for t >= 0
         x_t = x.unsqueeze(-1) * self.t  # (*, N, K, n_points)
         cos_vals = torch.cos(x_t)
@@ -142,7 +142,7 @@ class EppsPulley(UnivariateTest):
 
         out = err @ self.weights
         if self.scale == 'statistic':
-            out = out * x.size(-2) * self.world_size
+            out = out * N * self.world_size
 
         # Weighted integration
         return out
