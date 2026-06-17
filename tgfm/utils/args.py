@@ -195,6 +195,7 @@ class GraphGPSArguments(ModelArguments):
     norm: str = field(default='batch_norm')  # PyG GPSConv internal norm
 
     # Will sum to dim, asserted in graphGPS
+    # Note: A good ratio is to have dim = node_out_dim + pe_out_dim/3.
     node_out_dim: int = field(default=96)
     pe_out_dim: int = field(default=32)
     se_out_dim: int = field(default=0)
