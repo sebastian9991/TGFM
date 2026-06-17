@@ -23,6 +23,9 @@ def get_dataset(
         'amazon-photos': (datasets.Amazon, {'name': 'Photo'}),
         'cora': (datasets.Planetoid, {'name': 'Cora'}),
         'proteins': (datasets.TUDataset, {'name': 'PROTEINS'}),
+        'mutag': (datasets.TUDataset, {'name': 'MUTAG'}),
+        'reddit-b': (datasets.TUDataset, {'name': 'REDDIT-BINARY'}),
+        'imbd-b': (datasets.TUDataset, {'name': 'IMBD-BINARY'}),
         'wikics': (datasets.WikiCS, {}),
     }
 
