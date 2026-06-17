@@ -1,3 +1,4 @@
+import random
 from typing import Any, Iterator, Optional, Tuple
 
 import numpy as np
@@ -162,6 +163,78 @@ class SubgraphPreparer:
 
         Wraps __iter__ and stops after batch_size yields. Re-creates the
         iterator on each call (so you get fresh samples each step).
+        """
+        out: list[PreparedSubgraph] = []
+        it = iter(self)
+        for _ in range(batch_size):
+            try:
+                out.append(next(it))
+            except StopIteration:
+                break
+        return out
+
+
+class GraphDatasetPreparer:
+    """Yields `PreparedSubgraph` objects, one per graph in a TUDataset.
+
+    The node-classification `SubgraphPreparer` samples ego-nets from one big
+    graph via NeighborLoader. Here the dataset is *many* graphs, so each graph
+    is its own unit: RWSE is precomputed once per graph (cheap -- TU graphs are
+    small) and, on each pass, global (BFS) + local (METIS) views are built over
+    that graph via `prepare_subgraph`.
+
+    Args:
+        dataset:        the full TUDataset (collection of graphs).
+        K:              RWSE dimension (random-walk landing-prob steps).
+        prepare_kwargs: forwarded to `prepare_subgraph` (num_local_parts,
+                        num_global_views, global_coverage_frac, ...).
+        indices:        restrict to a subset of graph indices (e.g. a train
+                        fold). None -> all graphs, which is right for SSL.
+        shuffle:        reshuffle the graph order on every `__iter__`.
+    """
+
+    def __init__(
+        self,
+        dataset: InMemoryDataset,
+        K: int,
+        prepare_kwargs: Optional[dict] = None,
+        indices: Optional[list[int]] = None,
+        shuffle: bool = True,
+    ):
+        self.dataset = dataset
+        self.K = K
+        self.prepare_kwargs = prepare_kwargs or {}
+        self.indices = list(range(len(dataset))) if indices is None else list(indices)
+        self.shuffle = shuffle
+
+        # Precompute RWSE once per graph and cache it (mirrors the spirit of
+        # FullGraphEncodingsCache, but keyed by graph index instead of n_id).
+        self.rwse_cache: dict[int, Tensor] = {}
+        for i in self.indices:
+            self.rwse_cache[i] = compute_rwse(dataset[i], K=K)
+
+    def __iter__(self) -> Iterator[PreparedSubgraph]:
+        order = self.indices[:]
+        if self.shuffle:
+            random.shuffle(order)
+        for i in order:
+            graph = self.dataset[i]
+            prep = prepare_subgraph(
+                graph,
+                rwse=self.rwse_cache[i],
+                se=None,
+                **self.prepare_kwargs,
+            )
+            # Tiny graphs (e.g. MUTAG ~18 nodes) can yield empty METIS parts;
+            # skip them at train time, same guard as SubgraphPreparer.
+            if len(prep.local_views) == 0 or len(prep.global_views) == 0:
+                continue
+            yield prep
+
+    def sample_batch(self, batch_size: int) -> list[PreparedSubgraph]:
+        """Pull `batch_size` PreparedSubgraphs. Re-creates the iterator on each
+        call (fresh shuffle), so each step sees a fresh random set of graphs --
+        same pattern as SubgraphPreparer.sample_batch.
         """
         out: list[PreparedSubgraph] = []
         it = iter(self)

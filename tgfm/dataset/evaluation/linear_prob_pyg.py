@@ -397,3 +397,83 @@ def node_classification(
     macro_std = MaF1s_np.std() * 100
     s = f'MiF1={micro_mean:.2f}+-{micro_std:.2f}, MaF1={macro_mean:.2f}+-{macro_std:.2f}'
     logging.info(f'Evaluation stats: {s}')
+
+
+def evaluate_graph_classification(
+    Z: Tensor,
+    y: Tensor,
+    num_folds: int = 10,
+    repeat: int = 1,
+    seed: int = 0,
+    C_grid: Optional[list[float]] = None,
+) -> dict:
+    """Standard TU graph-classification probe: 10-fold linear SVM.
+
+    Standardizes features, sweeps SVM C per train split via inner CV, and reports
+    mean/std accuracy across folds (optionally averaged over `repeat` seeds).
+    Return shape mirrors `evaluate_linear_probe`.
+    """
+    from sklearn.metrics import accuracy_score
+    from sklearn.model_selection import GridSearchCV, StratifiedKFold
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVC
+
+    X = Z.numpy()
+    Y = y.numpy()
+    C_grid = C_grid or [1e-3, 1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3]
+
+    accuracies: list[float] = []
+    for r in range(repeat):
+        skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=seed + r)
+        for train_idx, test_idx in skf.split(X, Y):
+            clf = GridSearchCV(
+                make_pipeline(StandardScaler(), SVC(kernel='linear')),
+                param_grid={'svc__C': C_grid},
+                cv=5,
+                refit=True,
+            )
+            clf.fit(X[train_idx], Y[train_idx])
+            preds = clf.predict(X[test_idx])
+            accuracies.append(accuracy_score(Y[test_idx], preds))
+
+    accuracies_arr = np.asarray(accuracies)
+    return {
+        'probe_type': f'svm-linear-{num_folds}fold',
+        'mean': float(accuracies_arr.mean()),
+        'std': float(accuracies_arr.std()),
+        'accuracies': accuracies_arr.tolist(),
+    }
+
+
+def evaluate(
+    embeddings: Tensor,
+    full_data: Data,
+    repeat: int,
+    data_random_seed: int,
+    dataset: str,
+    full_eval: bool = False,
+) -> dict:
+    """Evaluate function for LeGraph node classification."""
+    results = evaluate_linear_probe(
+        embeddings,
+        full_data,
+        repeat=repeat,
+        data_random_seed=data_random_seed,
+    )
+
+    if full_eval:
+        logging.info(f'Full Evaluation.')
+        has_masks = (
+            hasattr(full_data, 'train_mask')
+            and hasattr(full_data, 'val_mask')
+            and hasattr(full_data, 'test_mask')
+            and full_data.train_mask is not None
+        )
+        if has_masks:
+            masks = (full_data.train_mask, full_data.val_mask, full_data.test_mask)
+        else:
+            masks = None
+        node_classification(Z=embeddings, Y=full_data.y, dataset=dataset, masks=masks)
+
+    return results
