@@ -60,7 +60,6 @@ from tgfm.utils.args import (
     parse_args,
 )
 from tgfm.utils.diagnostics import collapse_diagnostics
-from tgfm.utils.learning_utils import batch_normalize
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.seed import seed_everything
@@ -274,9 +273,6 @@ def train(
             feat_mask_rate=model_args.feat_mask_rate,
             augment_views=True,
         )
-
-        z_global = batch_normalize(z_global)
-        z_local = batch_normalize(z_local)
 
         out = loss_fn(z_global, z_local)
 
