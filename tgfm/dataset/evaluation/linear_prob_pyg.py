@@ -424,7 +424,7 @@ def evaluate_graph_classification(
     C_grid = C_grid or [1e-3, 1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3]
 
     accuracies: list[float] = []
-    for r in range(repeat):
+    for r in tqdm(range(repeat)):
         skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=seed + r)
         for train_idx, test_idx in skf.split(X, Y):
             clf = GridSearchCV(

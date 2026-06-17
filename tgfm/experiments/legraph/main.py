@@ -28,6 +28,7 @@ mean-pool by `batch` to get one (d,) embedding per view, and reshape back to
 """
 
 import argparse
+import logging
 from pathlib import Path
 
 from tgfm.experiments.legraph.trainers import train_graph_task, train_node_task
@@ -55,6 +56,7 @@ def main() -> None:
     setup_logging(meta_args.log_file_path)
     for experiment, experiment_arg in experiment_args.exp_args.items():
         if experiment_arg.data_args.task_name == 'node':
+            logging.info(f'Training for node task.')
             train_node_task(
                 model_args=experiment_arg.model_args,
                 data_args=experiment_arg.data_args,
@@ -62,6 +64,7 @@ def main() -> None:
                 save_dir=root_dir / 'weights',
             )
         elif experiment_arg.data_args.task_name == 'graph':
+            logging.info(f'Training for graph task.')
             train_graph_task(
                 model_args=experiment_arg.model_args,
                 data_args=experiment_arg.data_args,
