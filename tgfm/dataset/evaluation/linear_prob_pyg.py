@@ -94,6 +94,7 @@ def fit_logistic_regression(
     """
     one_hot_encoder = OneHotEncoder(categories='auto', sparse_output=False)
     y = one_hot_encoder.fit_transform(y.reshape(-1, 1)).astype(bool)
+    # TODO: Why would we need to normalize it? Taken from TGRL paper.
     X = normalize(X, norm='l2')
 
     rng = np.random.RandomState(data_random_seed)
@@ -187,7 +188,6 @@ def evaluate_linear_probe(
     X = embeddings.cpu().numpy()
     y = full_data.y.cpu().numpy()
 
-    assert X.shape[0] == y.shape[0]
     has_masks = (
         hasattr(full_data, 'train_mask')
         and hasattr(full_data, 'val_mask')
@@ -195,6 +195,7 @@ def evaluate_linear_probe(
         and full_data.train_mask is not None
     )
 
+    assert X.shape[0] == y.shape[0] or has_masks
     if has_masks:
         train_masks = full_data.train_mask.cpu().numpy()
         val_masks = full_data.val_mask.cpu().numpy()
