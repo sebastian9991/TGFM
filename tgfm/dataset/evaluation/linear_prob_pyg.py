@@ -399,7 +399,7 @@ def node_classification(
     logging.info(f'Evaluation stats: {s}')
 
 
-def evaluate_graph_classification(
+def evaluate_graph_classification_svm(
     Z: Tensor,
     y: Tensor,
     num_folds: int = 10,
@@ -440,6 +440,52 @@ def evaluate_graph_classification(
     accuracies_arr = np.asarray(accuracies)
     return {
         'probe_type': f'svm-linear-{num_folds}fold',
+        'mean': float(accuracies_arr.mean()),
+        'std': float(accuracies_arr.std()),
+        'accuracies': accuracies_arr.tolist(),
+    }
+
+
+def evaluate_graph_classification(
+    Z: Tensor,
+    y: Tensor,
+    num_folds: int = 10,
+    repeat: int = 5,
+    seed: int = 12345,
+) -> dict:
+    """Graph-JEPA-style probe: L2 logistic regression under 10-fold stratified CV.
+
+    One LogisticRegression per fold , accuracy per fold,
+    averaged over folds and over `repeat` re-split runs. Graph-JEPA used a fixed
+    split (random_state=12345) and varied the SSL seed across 5 runs; since we
+    probe a fixed embedding matrix, we instead vary the split seed per run to get
+    a meaningful spread. Return shape is unchanged.
+    """
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import accuracy_score
+    from sklearn.model_selection import StratifiedKFold
+
+    X = Z.numpy().astype(np.float64)
+    Y = y.numpy()
+
+    # Early-training collapse can leak NaN/Inf into embeddings, which makes the
+    # solver spin. Sanitize and warn rather than hang.
+    if not np.isfinite(X).all():
+        logging.warning('Non-finite values in graph embeddings; replacing with 0.')
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
+    accuracies: list[float] = []
+    for r in range(repeat):
+        skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=seed + r)
+        for train_idx, test_idx in skf.split(X, Y):
+            clf = LogisticRegression(max_iter=10000)
+            clf.fit(X[train_idx], Y[train_idx])
+            preds = clf.predict(X[test_idx])
+            accuracies.append(accuracy_score(Y[test_idx], preds))
+
+    accuracies_arr = np.asarray(accuracies)
+    return {
+        'probe_type': f'logreg-{num_folds}fold',
         'mean': float(accuracies_arr.mean()),
         'std': float(accuracies_arr.std()),
         'accuracies': accuracies_arr.tolist(),
