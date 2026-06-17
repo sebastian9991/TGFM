@@ -46,7 +46,7 @@ from tgfm.utils.args import (
     ModelArguments,
 )
 from tgfm.utils.diagnostics import collapse_diagnostics
-from tgfm.utils.train import save_checkpoint
+from tgfm.utils.train_utils import save_checkpoint
 from tgfm.views.construct_views import build_views, flatten_views
 from tgfm.views.prepare import compute_rwse
 
