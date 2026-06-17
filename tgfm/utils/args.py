@@ -7,6 +7,8 @@ from hf_argparser import HfArgumentParser
 
 from tgfm.utils.path import get_root_dir, get_scratch
 
+VALID_TASKS = {'graph', 'node', 'link'}
+
 
 @dataclass
 class MetaArguments:
@@ -86,6 +88,12 @@ class DataArguments:
         metadata={'help': 'Whether to transform dataset.'},
     )
 
+    def __post_init__(self) -> None:
+        if self.task_name not in VALID_TASKS:
+            raise ValueError(
+                f"Invalid task name '{self.task_name}'. Must be one of {VALID_TASKS}"
+            )
+
 
 @dataclass
 class ModelArguments:
@@ -151,6 +159,8 @@ class SimpleMPNN(ModelArguments):
     model: str = 'SimpleMPNN'
     # pretraining
     lam: float = field(default=0.1)  # uniformity weight
+    edge_drop_rate: float = field(default=0.3)  # p_d
+    feat_mask_rate: float = field(default=0.1)  # p_m
     hid_dims: list = field(default_factory=lambda: [256, 256])
     encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
 
