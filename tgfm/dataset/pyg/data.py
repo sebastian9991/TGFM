@@ -25,7 +25,7 @@ def get_dataset(
         'proteins': (datasets.TUDataset, {'name': 'PROTEINS'}),
         'mutag': (datasets.TUDataset, {'name': 'MUTAG'}),
         'reddit-b': (datasets.TUDataset, {'name': 'REDDIT-BINARY'}),
-        'imbd-b': (datasets.TUDataset, {'name': 'IMBD-BINARY'}),
+        'imdb-b': (datasets.TUDataset, {'name': 'IMDB-BINARY'}),
         'wikics': (datasets.WikiCS, {}),
     }
 
