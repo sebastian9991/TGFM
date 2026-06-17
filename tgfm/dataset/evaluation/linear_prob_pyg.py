@@ -475,7 +475,7 @@ def evaluate_graph_classification(
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
 
     accuracies: list[float] = []
-    for r in range(repeat):
+    for r in tqdm(range(repeat)):
         skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=seed + r)
         for train_idx, test_idx in skf.split(X, Y):
             clf = LogisticRegression(max_iter=10000)
