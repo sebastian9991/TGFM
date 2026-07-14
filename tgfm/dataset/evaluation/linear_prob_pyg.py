@@ -94,6 +94,7 @@ def fit_logistic_regression(
     """
     one_hot_encoder = OneHotEncoder(categories='auto', sparse_output=False)
     y = one_hot_encoder.fit_transform(y.reshape(-1, 1)).astype(bool)
+    # TODO: Why would we need to normalize it? Taken from TGRL paper.
     X = normalize(X, norm='l2')
 
     rng = np.random.RandomState(data_random_seed)
@@ -187,7 +188,6 @@ def evaluate_linear_probe(
     X = embeddings.cpu().numpy()
     y = full_data.y.cpu().numpy()
 
-    assert X.shape[0] == y.shape[0]
     has_masks = (
         hasattr(full_data, 'train_mask')
         and hasattr(full_data, 'val_mask')
@@ -195,6 +195,7 @@ def evaluate_linear_probe(
         and full_data.train_mask is not None
     )
 
+    assert X.shape[0] == y.shape[0] or has_masks
     if has_masks:
         train_masks = full_data.train_mask.cpu().numpy()
         val_masks = full_data.val_mask.cpu().numpy()
@@ -396,3 +397,129 @@ def node_classification(
     macro_std = MaF1s_np.std() * 100
     s = f'MiF1={micro_mean:.2f}+-{micro_std:.2f}, MaF1={macro_mean:.2f}+-{macro_std:.2f}'
     logging.info(f'Evaluation stats: {s}')
+
+
+def evaluate_graph_classification_svm(
+    Z: Tensor,
+    y: Tensor,
+    num_folds: int = 10,
+    repeat: int = 1,
+    seed: int = 0,
+    C_grid: Optional[list[float]] = None,
+) -> dict:
+    """Standard TU graph-classification probe: 10-fold linear SVM.
+
+    Standardizes features, sweeps SVM C per train split via inner CV, and reports
+    mean/std accuracy across folds (optionally averaged over `repeat` seeds).
+    Return shape mirrors `evaluate_linear_probe`.
+    """
+    from sklearn.metrics import accuracy_score
+    from sklearn.model_selection import GridSearchCV, StratifiedKFold
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVC
+
+    X = Z.numpy()
+    Y = y.numpy()
+    C_grid = C_grid or [1e-3, 1e-2, 1e-1, 1.0, 1e1, 1e2, 1e3]
+
+    accuracies: list[float] = []
+    for r in tqdm(range(repeat)):
+        skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=seed + r)
+        for train_idx, test_idx in skf.split(X, Y):
+            clf = GridSearchCV(
+                make_pipeline(StandardScaler(), SVC(kernel='linear')),
+                param_grid={'svc__C': C_grid},
+                cv=5,
+                refit=True,
+            )
+            clf.fit(X[train_idx], Y[train_idx])
+            preds = clf.predict(X[test_idx])
+            accuracies.append(accuracy_score(Y[test_idx], preds))
+
+    accuracies_arr = np.asarray(accuracies)
+    return {
+        'probe_type': f'svm-linear-{num_folds}fold',
+        'mean': float(accuracies_arr.mean()),
+        'std': float(accuracies_arr.std()),
+        'accuracies': accuracies_arr.tolist(),
+    }
+
+
+def evaluate_graph_classification(
+    Z: Tensor,
+    y: Tensor,
+    num_folds: int = 10,
+    repeat: int = 5,
+    seed: int = 12345,
+) -> dict:
+    """Graph-JEPA-style probe: L2 logistic regression under 10-fold stratified CV.
+
+    One LogisticRegression per fold , accuracy per fold,
+    averaged over folds and over `repeat` re-split runs. Graph-JEPA used a fixed
+    split (random_state=12345) and varied the SSL seed across 5 runs; since we
+    probe a fixed embedding matrix, we instead vary the split seed per run to get
+    a meaningful spread. Return shape is unchanged.
+    """
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import accuracy_score
+    from sklearn.model_selection import StratifiedKFold
+
+    X = Z.numpy().astype(np.float64)
+    Y = y.numpy()
+
+    # Early-training collapse can leak NaN/Inf into embeddings, which makes the
+    # solver spin. Sanitize and warn rather than hang.
+    if not np.isfinite(X).all():
+        logging.warning('Non-finite values in graph embeddings; replacing with 0.')
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+
+    accuracies: list[float] = []
+    for r in tqdm(range(repeat)):
+        skf = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=seed + r)
+        for train_idx, test_idx in tqdm(skf.split(X, Y), desc='split'):
+            clf = LogisticRegression(max_iter=10000)
+            clf.fit(X[train_idx], Y[train_idx])
+            preds = clf.predict(X[test_idx])
+            accuracies.append(accuracy_score(Y[test_idx], preds))
+
+    accuracies_arr = np.asarray(accuracies)
+    return {
+        'probe_type': f'logreg-{num_folds}fold',
+        'mean': float(accuracies_arr.mean()),
+        'std': float(accuracies_arr.std()),
+        'accuracies': accuracies_arr.tolist(),
+    }
+
+
+def evaluate(
+    embeddings: Tensor,
+    full_data: Data,
+    repeat: int,
+    data_random_seed: int,
+    dataset: str,
+    full_eval: bool = False,
+) -> dict:
+    """Evaluate function for LeGraph node classification."""
+    results = evaluate_linear_probe(
+        embeddings,
+        full_data,
+        repeat=repeat,
+        data_random_seed=data_random_seed,
+    )
+
+    if full_eval:
+        logging.info(f'Full Evaluation.')
+        has_masks = (
+            hasattr(full_data, 'train_mask')
+            and hasattr(full_data, 'val_mask')
+            and hasattr(full_data, 'test_mask')
+            and full_data.train_mask is not None
+        )
+        if has_masks:
+            masks = (full_data.train_mask, full_data.val_mask, full_data.test_mask)
+        else:
+            masks = None
+        node_classification(Z=embeddings, Y=full_data.y, dataset=dataset, masks=masks)
+
+    return results

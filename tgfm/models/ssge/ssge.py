@@ -26,11 +26,13 @@ The loss returns an ``SSGEOutput`` whose fields (``total``, ``pred``,
 existing training/logging loop.
 """
 
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import torch
 import torch.nn as nn
 from torch import Tensor
+
+NormMode = Literal['batch', 'l2', 'batch+l2', 'none']
 
 SSGE_PRESETS: dict[str, dict] = {
     'Cora': dict(
@@ -129,6 +131,14 @@ def batch_normalize(z: Tensor) -> Tensor:
     return (z - z.mean(0)) / z.std(0)
 
 
+def l2_normalize(z: Tensor, rescale: bool = False) -> Tensor:
+    """Row-wise projection onto the sphere: z_i <- z_i / ||z_i||_2."""
+    z = torch.nn.functional.normalize(z, p=2, dim=1)
+    if rescale:
+        z = z * z.shape[1] ** 0.5
+    return z
+
+
 def uniformity(z: Tensor) -> Tensor:
     """W2 distance between the empirical embedding law and N(0, I), up to consts.
 
@@ -154,15 +164,22 @@ class SSGELoss(nn.Module):
             before the loss is computed. Set False if you normalize upstream.
     """
 
-    def __init__(self, lambd: float, normalize: bool = True) -> None:
+    def __init__(self, lambd: float, norm_mode: NormMode = 'batch') -> None:
         super().__init__()
         self.lambd = lambd
-        self.normalize = normalize
+        self.norm_mode = norm_mode
+
+    def _apply_norm(self, z: Tensor) -> Tensor:
+        if self.norm_mode in ('batch', 'batch+l2'):
+            z = batch_normalize(z)
+        if self.norm_mode in ('l2', 'batch+l2'):
+            z = l2_normalize(z)
+
+        return z
 
     def forward(self, z1: Tensor, z2: Tensor) -> SSGEOutput:
-        if self.normalize:
-            z1 = batch_normalize(z1)
-            z2 = batch_normalize(z2)
+        z1 = self._apply_norm(z1)
+        z2 = self._apply_norm(z2)
 
         # Invariance: maximize per-node agreement between the two views.
         # (negative dot product, averaged over nodes)
