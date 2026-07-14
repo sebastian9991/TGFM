@@ -132,7 +132,7 @@ class SubgraphPreparer:
         self.full_data = full_data
         self.cache = cache
         self.prepare_kwargs = prepare_kwargs or {}
-        self.num_neighbors = num_neighbors or [10, 10]
+        self.num_neighbors = num_neighbors or [-1, -1, -1]
         self.seed_batch_size = seed_batch_size
 
         self.loader = NeighborLoader(

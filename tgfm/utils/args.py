@@ -81,6 +81,10 @@ class DataArguments:
         metadata={'help': 'Number of test splits to do for uncertainty estimates.'},
         default=1,
     )
+    transform: bool = field(
+        default=False,
+        metadata={'help': 'Whether to transform dataset.'},
+    )
 
 
 @dataclass
@@ -167,6 +171,7 @@ class GraphGPSArguments(ModelArguments):
     num_local_parts: int = field(default=8)
     global_coverage_frac: float = field(default=0.7)
     global_strategy: str = field(default='bfs')
+    num_local_as_global: int = field(default=0)
 
     lambd: float = field(default=0.05)
     num_slices: int = field(default=256)

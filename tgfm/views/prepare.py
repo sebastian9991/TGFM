@@ -53,6 +53,7 @@ def build_local_views_metis(
     num_parts: int,
     expand_hops: int = 1,
     se: Optional[Tensor] = None,
+    directed: bool = False,
 ) -> List[Data]:
     """Partition `data` with METIS into `num_parts`, then 1-hop expand each part.
 
@@ -61,7 +62,11 @@ def build_local_views_metis(
     """
     # ClusterData internally uses METIS (via torch-sparse / pyg-lib).
     safe_cluster(data=data, num_parts=num_parts)
-    cluster_data = ClusterData(data, num_parts=num_parts, log=False)
+    N = data.num_nodes
+    # METIS requires an undirected graph avoids segumentation faults.
+    undirected_ei = to_undirected(data.edge_index, num_nodes=N)
+    metis_data = Data(edge_index=undirected_ei, num_nodes=N)
+    cluster_data = ClusterData(metis_data, num_parts=num_parts, log=False)
 
     views: List[Data] = []
     N = data.num_nodes
@@ -83,19 +88,22 @@ def build_local_views_metis(
         part_nodes = perm[start:end].to(device)  # original node ids in this part
 
         # k_hop_subgraph expands the seed set by `num_hops`.
-        sub_nodes, sub_ei, _, _ = k_hop_subgraph(
+        sub_nodes, _, _, _ = k_hop_subgraph(
             part_nodes,
             num_hops=expand_hops,
-            edge_index=data.edge_index,
-            relabel_nodes=True,
+            edge_index=undirected_ei,
+            relabel_nodes=False,
             num_nodes=N,
         )
 
+        view_ei = data.edge_index if directed else undirected_ei
+        sub_ei, _ = subgraph(sub_nodes, view_ei, relabel_nodes=True, num_nodes=N)
         view = Data(
             x=data.x[sub_nodes],
             edge_index=sub_ei,
             pe=rwse[sub_nodes],
         )
+        view.n_id = sub_nodes
         if se is not None:
             view.se = se[sub_nodes]
         if getattr(data, 'edge_attr', None) is not None:
@@ -105,6 +113,78 @@ def build_local_views_metis(
             pass
         views.append(view)
 
+    return views
+
+
+def build_global_views_from_local_union(
+    data: Data,
+    rwse: Tensor,
+    local_views: List[Data],
+    num_views: int = 1,
+    local_frac: float = 0.5,
+    rng: Optional[torch.Generator] = None,
+    se: Optional[Tensor] = None,
+    directed: bool = False,
+) -> List[Data]:
+    """Build each global view from the union of a random subset of local views.
+
+    Instead of sampling the source graph directly (BFS/RWR), each global view is
+    assembled from the local patches already produced by
+    `build_local_views_metis`: we sample ``ceil(local_frac * len(local_views))``
+    of them, union their *original* node ids, and rebuild one connected-ish?
+    subgraph on `data` from that union. This ties the global view's support to
+    the local partition geometry.
+
+    Each entry of `local_views` must carry `n_id` (original node ids into `data`),
+    which `build_local_views_metis` attaches automatically.
+
+    Args:
+        data:        the source subgraph the local views were cut from.
+        rwse:        RWSE for `data`'s nodes, sliced per view (same convention as
+                     the other builders).
+        local_views: the list returned by `build_local_views_metis`.
+        num_views:   how many global views to produce.
+        local_frac:  fraction of available local views to merge into each global
+                     view. ``1.0`` merges all of them (deterministic, identical
+                     every call); use ``< 1.0`` to get diverse global views.
+        rng:         generator for reproducible sampling.
+        se:          optional structural encoding, sliced per view.
+        directed:    if True, keep `data`'s edge directions in the view; if False
+                     (default, matching the other builders here) symmetrize.
+    """
+    if not local_views:
+        return []
+    for lv in local_views:
+        if not hasattr(lv, 'n_id'):
+            raise AttributeError(
+                'local view is missing `n_id`; build it with '
+                'build_local_views_metis (which attaches original node ids).'
+            )
+
+    L = len(local_views)
+    k = max(1, min(L, int(round(local_frac * L))))
+    N = data.num_nodes
+    device = data.edge_index.device
+
+    views: List[Data] = []
+    for _ in range(num_views):
+        chosen = torch.randperm(L, generator=rng)[:k].tolist()
+        node_ids = torch.cat([local_views[i].n_id for i in chosen])
+        nodes = torch.unique(node_ids).to(device)  # sorted, de-duplicated
+
+        sub_ei, _ = subgraph(nodes, data.edge_index, relabel_nodes=True, num_nodes=N)
+        if not directed:
+            sub_ei = to_undirected(edge_index=sub_ei)
+
+        view = Data(
+            x=data.x[nodes],
+            edge_index=sub_ei,
+            pe=rwse[nodes],
+        )
+        if se is not None:
+            view.se = se[nodes]
+        view.n_id = nodes
+        views.append(view)
     return views
 
 
@@ -139,7 +219,6 @@ def build_global_views(
             raise ValueError(f'Unknown global view strategy: {strategy}')
 
         sub_ei, _ = subgraph(nodes, data.edge_index, relabel_nodes=True, num_nodes=N)
-        sub_ei = to_undirected(edge_index=sub_ei)
         view = Data(
             x=data.x[nodes],
             edge_index=sub_ei,
@@ -218,6 +297,8 @@ def prepare_subgraph(
     num_global_views: int = 2,
     global_coverage_frac: float = 0.7,
     global_strategy: str = 'bfs',
+    global_local_frac: float = 0.5,
+    num_local_as_global: int = 0,
     rwse: Optional[Tensor] = None,
     se: Optional[Tensor] = None,
 ) -> PreparedSubgraph:
@@ -231,6 +312,8 @@ def prepare_subgraph(
         num_global_views: The number of global views.
         global_coverage_frac: Coverage of subgraph nodes to use, defines global view size.
         global_strategy: Strategy of constructing the global view.
+        global_local_frac: Fraction of coverage in union of local node ids for global view.
+        num_local_as_global: Integer which defines the slices of local views to take as global view.
         rwse: Optional precomputed RWSE restricted to `data`'s nodes (shape
               (N, K)). For transductive node datasets you usually want to
               compute RWSE *once on the full graph* and slice it down to the
@@ -251,14 +334,29 @@ def prepare_subgraph(
         expand_hops=1,
         se=se,
     )
-    globals_ = build_global_views(
-        data,
-        rwse,
-        num_views=num_global_views,
-        coverage_frac=global_coverage_frac,
-        strategy=global_strategy,
-        se=se,
-    )
+    if global_strategy == 'local':
+        if num_local_as_global > 0:
+            k = min(num_local_as_global, len(locals_))
+            globals_ = locals_[:k]
+            locals_ = locals_[k:]
+        else:
+            globals_ = build_global_views_from_local_union(
+                data,
+                rwse,
+                local_views=locals_,
+                num_views=num_global_views,
+                local_frac=global_local_frac,
+                se=se,
+            )
+    else:
+        globals_ = build_global_views(
+            data,
+            rwse,
+            num_views=num_global_views,
+            coverage_frac=global_coverage_frac,
+            strategy=global_strategy,
+            se=se,
+        )
     return PreparedSubgraph(
         source=data, rwse=rwse, global_views=globals_, local_views=locals_
     )
