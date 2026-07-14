@@ -7,6 +7,8 @@ from hf_argparser import HfArgumentParser
 
 from tgfm.utils.path import get_root_dir, get_scratch
 
+VALID_TASKS = {'graph', 'node', 'link'}
+
 
 @dataclass
 class MetaArguments:
@@ -71,6 +73,9 @@ class MetaArguments:
 class DataArguments:
     """Configuration of task-level data and problem settings."""
 
+    data_name: str = field(
+        metadata={'help': 'The name of the dataset, needed for pre-built datasets.'},
+    )
     task_name: str = field(
         metadata={'help': 'The name of the task to train on'},
     )
@@ -78,6 +83,16 @@ class DataArguments:
         metadata={'help': 'Number of test splits to do for uncertainty estimates.'},
         default=1,
     )
+    transform: bool = field(
+        default=False,
+        metadata={'help': 'Whether to transform dataset.'},
+    )
+
+    def __post_init__(self) -> None:
+        if self.task_name not in VALID_TASKS:
+            raise ValueError(
+                f"Invalid task name '{self.task_name}'. Must be one of {VALID_TASKS}"
+            )
 
 
 @dataclass
@@ -92,12 +107,25 @@ class ModelArguments:
     weight_decay: float = field(
         default=2.36e-5, metadata={'help': 'Weight decay on the optimizer.'}
     )
+    batch_size: int = field(default=32)
+    num_steps: int = field(
+        default=100, metadata={'help': 'The number of steps of training.'}
+    )
     epochs: int = field(default=100, metadata={'help': 'Number of epochs.'})
     runs: int = field(default=3, metadata={'help': 'Number of trials.'})
     patience: int = field(
         default=10,
         metadata={'help': 'Number of epochs to wait before no validation improvement.'},
     )
+    eval_frequency: int = field(
+        default=500, metadata={'help': 'The frequency of evaluation.'}
+    )
+    eval_repeat: int = field(default=1, metadata={'help': 'The repeats of evaluation.'})
+    log_frequency: int = field(
+        default=10, metadata={'help': 'The frequency of logging.'}
+    )
+    edge_drop_rate: float = field(default=0.3)  # p_d
+    feat_mask_rate: float = field(default=0.1)  # p_m
     use_cuda: bool = field(default=True, metadata={'help': 'Whether to use cuda.'})
     device: int = field(default=0, metadata={'help': 'Device to be used.'})
 
@@ -118,11 +146,90 @@ class UnigraphArguments(ModelArguments):
     norm: str = field(default='layernorm')
     gradient_checkpointing: bool = field(default=False)
     negative_slope: float = field(default=0.2)
-    batch_size: int = field(default=32)
     mask_rate: float = field(default=0.15)
     lam: float = field(default=0.1)
     momentum: float = field(default=0.996)
     delayed_ema_epoch: int = field(default=10)
+
+
+@dataclass
+class SimpleMPNN(ModelArguments):
+    """Configuration of model architecture and training hyperparameters."""
+
+    model: str = 'SimpleMPNN'
+    # pretraining
+    lam: float = field(default=0.1)  # uniformity weight
+    edge_drop_rate: float = field(default=0.3)  # p_d
+    feat_mask_rate: float = field(default=0.1)  # p_m
+    hid_dims: list = field(default_factory=lambda: [256, 256])
+    encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
+
+    rwse_K: int = field(default=16)  # K for RWSE
+
+    num_global_views: int = field(default=2)
+    num_local_parts: int = field(default=8)
+    global_coverage_frac: float = field(default=0.7)
+    global_strategy: str = field(default='bfs')
+    num_local_as_global: int = field(default=0)
+
+    lambd: float = field(default=0.05)
+    num_slices: int = field(default=256)
+
+    # probe (paper eval)
+    lr2: float = field(default=1e-2)
+    wd2: float = field(default=1e-4)
+
+
+@dataclass
+class GraphGPSArguments(ModelArguments):
+    """Configuration of model architecture and training hyperparameters."""
+
+    model: str = 'GraphGPS'
+    dim: int = field(default=128)
+    num_layers: int = field(default=3)
+    num_heads: int = field(default=4)
+    local_gnn_type: str = field(default='GINE')
+    attn_type: str = field(
+        default='multihead'
+    )  # PyG GPSConv: "multihead" | "performer"
+    norm: str = field(default='batch_norm')  # PyG GPSConv internal norm
+
+    # Will sum to dim, asserted in graphGPS
+    # Note: A good ratio is to have dim = node_out_dim + pe_out_dim/3.
+    node_out_dim: int = field(default=96)
+    pe_out_dim: int = field(default=32)
+    se_out_dim: int = field(default=0)
+
+    num_neighbors: list[int] = field(
+        default_factory=lambda: [-1],
+    )
+
+    rwse_K: int = field(default=16)  # K for RWSE
+
+    num_global_views: int = field(default=2)
+    num_local_parts: int = field(default=8)
+    global_coverage_frac: float = field(default=0.7)
+    global_strategy: str = field(default='bfs')
+    num_local_as_global: int = field(default=0)
+
+    lambd: float = field(default=0.05)
+    num_slices: int = field(default=256)
+
+
+@dataclass
+class SSGEArguments(ModelArguments):
+    """SSGE Configuration of model architecture and training hyperparameters."""
+
+    model: str = 'SSGE'
+    # pretraining
+    lam: float = field(default=0.1)  # uniformity weight
+    hid_dims: list = field(default_factory=lambda: [256, 256])
+    encoder: str = field(default='gcn')  # 'gcn' or 'mlp' (CoauthorCS)
+    num_slices: int = field(default=256)
+
+    # probe (paper eval)
+    lr2: float = field(default=1e-2)
+    wd2: float = field(default=1e-4)
 
 
 @dataclass
@@ -166,6 +273,9 @@ class ExperimentArguments:
 
 MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'Unigraph': UnigraphArguments,
+    'GraphGPS': GraphGPSArguments,
+    'SSGE': SSGEArguments,
+    'SimpleMPNN': SimpleMPNN,
 }
 
 

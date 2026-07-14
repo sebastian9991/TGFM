@@ -1,0 +1,25 @@
+MetaArguments:
+  log_file_path: "ssge.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "ssge"
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    LeGraph:
+      model_args:
+        model: "SSGE"
+        epochs: 80
+        batch_size: 16
+        dropout: 0.2
+        lr: 1.0e-3
+        weight_decay: 1.0e-5
+        device: 0
+        eval_frequency: 0
+        eval_repeat: 10
+        log_frequency: 10
+      data_args:
+        data_name: 'cora'
+        task_name: ""
