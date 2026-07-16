@@ -20,7 +20,7 @@ class Universal_Collator(object):
     def __init__(self, task: str, args: ModelArguments, device: torch.device) -> None:
         self.device = device
         self.task = task.lower()
-        assert isinstance(ModelArguments, TransferArguments)
+        assert isinstance(args, TransferArguments)
         self.transforms: Optional[BaseTransform] = None
 
         if self.task in ('grace', 'sigreg'):
