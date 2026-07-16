@@ -256,6 +256,7 @@ class TransferArguments(ModelArguments):
     """Arguments for transfer experiments."""
 
     # model parameters
+    model: str = 'Transfer'
     encoder: str = field(default='GCN')
     hidden_dim: int = field(default=384)
     n_head: int = field(default=4)
@@ -345,7 +346,7 @@ MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'GraphGPS': GraphGPSArguments,
     'SSGE': SSGEArguments,
     'SimpleMPNN': SimpleMPNN,
-    'TransferLearning': TransferArguments,
+    'Transfer': TransferArguments,
 }
 
 
