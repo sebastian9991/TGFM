@@ -321,7 +321,7 @@ def pretrain(
     dataset: Optional[Union[LazyGraphDataset, List[Any]]] = None
     # TODO: dyanmic folder locations
     if 'papers100M' == data_args.data_name:
-        data_dir = '$SCRATCH/GSTBench/subgraph/'
+        data_dir = '$SCRATCH/GSTBench/subgraphs/'
         graph_name = 'papers100M'
         feature_path = '$SCRATCH/GSTBench/emb/sbert_embeddings_con_split.npy'
         graph_list, n_node_list, n_edge_list = load_subgraphs(data_dir, graph_name)
