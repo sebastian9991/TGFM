@@ -75,9 +75,9 @@ class PretrainSIGReg(torch.nn.Module):
 
     def reset_parameters(self) -> None:
         self.encoder.reset_parameters()
-        for module in self.projector:
-            if isinstance(module, nn.Linear):
-                module.reset_parameters()
+        # for module in self.projector:
+        #     if isinstance(module, nn.Linear):
+        #         module.reset_parameters()
 
     def trainable_parameters(self) -> list:
         r"""Returns the parameters that will be updated via an optimizer."""
