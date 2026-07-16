@@ -345,6 +345,7 @@ MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'GraphGPS': GraphGPSArguments,
     'SSGE': SSGEArguments,
     'SimpleMPNN': SimpleMPNN,
+    'TransferLearning': TransferArguments,
 }
 
 
