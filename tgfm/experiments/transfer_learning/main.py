@@ -31,6 +31,7 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader, Dataset, DistributedSampler
+from tqdm import tqdm
 
 from tgfm.dataset.lazy_graph import LazyGraphDataset
 from tgfm.evaluation.transfer_eval import (
@@ -127,7 +128,7 @@ def train(
 
     # training
     logging.info(f'------------Training-------------')
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs), desc='Training'):
         model.train()
         sampler.set_epoch(epoch)
         epoch_loss_mean = 0
