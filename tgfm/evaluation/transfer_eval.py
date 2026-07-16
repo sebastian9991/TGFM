@@ -164,7 +164,7 @@ def get_linear_results(
     args: ModelArguments,
     device: Optional[torch.device] = None,
 ) -> Tuple[float, float]:
-    assert isinstance(ModelArguments, TransferArguments)
+    assert isinstance(args, TransferArguments)
     data['x']
     labels = data['y']
     data['edge_index']
@@ -251,7 +251,7 @@ def get_mean_linear_results(
     args: ModelArguments,
     device: Optional[torch.device] = None,
 ) -> Tuple[float, float, float, float]:
-    assert isinstance(ModelArguments, TransferArguments)
+    assert isinstance(args, TransferArguments)
     val_acc_list = []
     test_acc_list = []
     lr, l2, dropout = args.linear_lr, args.linear_l2, args.linear_dropout
