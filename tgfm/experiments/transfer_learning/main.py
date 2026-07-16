@@ -129,7 +129,7 @@ def train(
 
     # training
     logging.info(f'------------Training-------------')
-    for epoch in tqdm(range(epochs), desc='Training'):
+    for epoch in tqdm(range(epochs), desc='Epochs'):
         model.train()
         sampler.set_epoch(epoch)
         epoch_loss_mean = 0
@@ -137,7 +137,7 @@ def train(
         step = 0
         start_time = time.time()
 
-        for data in dataloader:
+        for data in tqdm(dataloader, desc='Training'):
             optimizer.zero_grad()
             train_loss = model(data)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
