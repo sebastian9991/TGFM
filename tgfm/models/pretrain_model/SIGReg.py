@@ -30,8 +30,8 @@ from tgfm.models.base_models.base_models import GATNet, GCNNet
 from tgfm.models.leJepa_loss import LeJEPALoss, LeJEPALossOutput
 from tgfm.utils.args import ModelArguments, TransferArguments
 
-GraphEncoder = Union[GCNNet, GATNet]
 
+GraphEncoder = Union[GCNNet, GATNet]
 
 def batch_normalize(z: Tensor) -> Tensor:
     """Per-dimension standardization across the node (batch) axis.
@@ -50,12 +50,12 @@ class PretrainSIGReg(torch.nn.Module):
         super(PretrainSIGReg, self).__init__()
         assert isinstance(args, TransferArguments)
         self.encoder = encoder
-        self.projector = nn.Sequential(
-            nn.Linear(args.hidden_dim, args.hidden_dim),
-            nn.ELU(),
-            nn.Linear(args.hidden_dim, args.hidden_dim),
-        )
-        self.act = nn.ReLU()
+        # self.projector = nn.Sequential(
+        #     nn.Linear(args.hidden_dim, args.hidden_dim),
+        #     nn.ELU(),
+        #     nn.Linear(args.hidden_dim, args.hidden_dim),
+        # )
+        # self.act = nn.ReLU()
         self.device = device
 
         # LeJEPALoss owns the loss composition:
