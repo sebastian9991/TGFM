@@ -50,12 +50,12 @@ class PretrainSIGReg(torch.nn.Module):
         super(PretrainSIGReg, self).__init__()
         assert isinstance(args, TransferArguments)
         self.encoder = encoder
-        # self.projector = nn.Sequential(
-        #     nn.Linear(args.hidden_dim, args.hidden_dim),
-        #     nn.ELU(),
-        #     nn.Linear(args.hidden_dim, args.hidden_dim),
-        # )
-        # self.act = nn.ReLU()
+        self.projector = nn.Sequential(
+            nn.Linear(args.hidden_dim, args.hidden_dim),
+            nn.ELU(),
+            nn.Linear(args.hidden_dim, args.hidden_dim),
+        )
+        self.act = nn.ReLU()
         self.device = device
 
         # LeJEPALoss owns the loss composition:
@@ -75,9 +75,9 @@ class PretrainSIGReg(torch.nn.Module):
 
     def reset_parameters(self) -> None:
         self.encoder.reset_parameters()
-        # for module in self.projector:
-        #     if isinstance(module, nn.Linear):
-        #         module.reset_parameters()
+        for module in self.projector:
+            if isinstance(module, nn.Linear):
+                module.reset_parameters()
 
     def trainable_parameters(self) -> list:
         r"""Returns the parameters that will be updated via an optimizer."""
@@ -133,16 +133,16 @@ class PretrainSIGReg(torch.nn.Module):
         )
 
         z1 = self.encoder(x1, A1)
-        # z1 = self.act(z1)
+        z1 = self.act(z1)
         z2 = self.encoder(x2, A2)
-        # z2 = self.act(z2)
+        z2 = self.act(z2)
 
-        # h1 = self.projector(z1)
-        # h2 = self.projector(z2)
+        h1 = self.projector(z1)
+        h2 = self.projector(z2)
 
         # Per-dimension standardization across nodes, as in the SSGE trainer.
-        h1 = batch_normalize(z1)
-        h2 = batch_normalize(z2)
+        # h1 = batch_normalize(z1)
+        # h2 = batch_normalize(z2)
 
         # Node axis plays the batch role: (N, 2, d) global views, no locals.
         z_global = torch.stack([h1, h2], dim=1)  # (N, 2, d)
