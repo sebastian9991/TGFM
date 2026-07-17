@@ -284,6 +284,10 @@ class TransferArguments(ModelArguments):
     p_edge_drop: float = field(default=0.2)
     p_feat_drop: float = field(default=0.2)
 
+    #BGRL parameters
+    bgrl_mm: float = field(default=0.99)
+    bgrl_pred_hid: int = field(default=512)
+
     # sigreg parameters
     n_directions: int = field(default=256)
     n_points: int = field(default=17)
