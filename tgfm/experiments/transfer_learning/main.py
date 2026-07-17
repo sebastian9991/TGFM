@@ -41,6 +41,7 @@ from tgfm.evaluation.transfer_eval import (
 )
 from tgfm.models.base_models.base_models import GATNet, GCNNet
 from tgfm.models.pretrain_model.SIGReg import PretrainSIGReg
+from tgfm.models.pretrain_model.bgrl import PretrainBGRL
 from tgfm.utils.args import (
     DataArguments,
     MetaArguments,
@@ -270,8 +271,11 @@ def get_model(device: torch.device, model_args: TransferArguments) -> torch.nn.M
     else:
         raise ValueError(f'Not implemented: {model_args.encoder}.')
 
+    pretrain_model: Optional[Union[PretrainBGRL, PretrainSIGReg]] = None
     if model_args.task.lower() == 'sigreg':
         pretrain_model = PretrainSIGReg(encoder, device, model_args)
+    elif model_args.task.lower() == 'bgrl':
+        pretrain_model = PretrainBGRL(encoder, device, model_args)
     else:
         raise ValueError(f'Not implemented: {model_args.task}.')
 
@@ -368,6 +372,9 @@ def pretrain(
     )
 
     model = get_model(device, model_args).to(device)
+
+    if model_args.task.lower() == 'bgrl':
+        model.set_total_steps(len(dataloader)*model_args.epochs)
 
     if device.type == 'cpu':
         model = DistributedDataParallel(model, find_unused_parameters=False)
