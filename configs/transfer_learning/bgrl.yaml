@@ -1,0 +1,73 @@
+MetaArguments:
+  log_file_path: "transfer_learning_BGRL.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "transfer_learning"   # reuse downstream_root + eval_task_dir (cached k-shot splits)
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    BGRL:
+      model_args:
+        model: "Transfer"
+
+        # model parameters
+        encoder: "GCN"
+        hidden_dim: 384
+        n_head: 4
+        n_layers: 2
+        attn_drop: 0.1
+        opt: "adamw"
+        norm: "none"
+        activation: "relu"
+        use_residual: false
+
+        # training parameters
+        scheduler: "cosine"
+        make_undirected: false
+        epochs: 5
+        warmup_steps: -1          # -1 sentinel: warmup = one full epoch
+        peak_lr: 1.0e-4
+        weight_decay: 0.0
+        dropout: 0.2
+        eval_step: 1
+        save_step: 1
+        num_workers: 4
+        device: 0
+
+        # ssl parameters
+        task: "bgrl"
+        p_edge_drop: 0.2
+        p_feat_drop: 0.2
+
+        # bgrl parameters
+        bgrl_mm: 0.99
+        bgrl_pred_hid: 512
+
+        # eval parameters
+        n_tasks: 5
+        n_shots: 5
+        n_val: 500
+        eval_data_seed: 0
+
+        # linear probing parameters
+        linear_runs: 1
+        linear_lr: 1.0e-2
+        linear_l2: 1.0e-4
+        linear_dropout: 0.1
+
+      data_args:
+        data_name: "papers100M"
+        task_name: "node"
+        pretrain_data_size: -1
+        pretrain_data_ids: [-1]
+        eval_data_names:
+          - "cora"
+          - "citeseer"
+          - "wikics"
+          - "dblp"
+          - "pubmed"
+          - "amazon-ratings"
+          - "child"
+          - "photo"
