@@ -79,6 +79,25 @@ class DataArguments:
     task_name: str = field(
         metadata={'help': 'The name of the task to train on'},
     )
+    pretrain_data_size: int = field(
+        metadata={'help': 'Pretraining data size.'}, default=-1
+    )
+    eval_data_names: List[str] = field(
+        default_factory=list,
+        metadata={
+            'nargs': '+',
+            'metavar': 'n',
+            'help': 'One or more eval datasets from PyG natives.',
+        },
+    )
+    pretrain_data_ids: List[int] = field(
+        default_factory=lambda: [-1],
+        metadata={
+            'nargs': '+',
+            'metavar': 'n',
+            'help': 'One or more eval datasets from PyG natives.',
+        },
+    )
     num_test_shards: int = field(
         metadata={'help': 'Number of test splits to do for uncertainty estimates.'},
         default=1,
@@ -233,6 +252,61 @@ class SSGEArguments(ModelArguments):
 
 
 @dataclass
+class TransferArguments(ModelArguments):
+    """Arguments for transfer experiments."""
+
+    # model parameters
+    model: str = 'Transfer'
+    encoder: str = field(default='GCN')
+    hidden_dim: int = field(default=384)
+    n_head: int = field(default=4)
+    n_layers: int = field(default=2)
+    attn_drop: float = field(default=0.1)
+    opt: str = field(default='adamw')
+    norm: str = field(default='none')
+    activation: str = field(default='relu')
+    use_residual: bool = field(default=False)
+
+    # training parameters
+    scheduler: str = field(default='cosine')
+    make_undirected: bool = field(default=False)
+    epochs: int = field(default=5)
+    warmup_steps: int = field(default=1)
+    peak_lr: float = field(default=0.001)
+    weight_decay: float = field(default=0.00001)
+    dropout: float = field(default=0.1)
+    eval_step: int = field(default=1)
+    save_step: int = field(default=1)
+    num_workers: int = field(default=4)
+
+    # ssl parameters
+    task: str = field(default='sigreg')
+    p_edge_drop: float = field(default=0.2)
+    p_feat_drop: float = field(default=0.2)
+
+    #BGRL parameters
+    bgrl_mm: float = field(default=0.99)
+    bgrl_pred_hid: int = field(default=512)
+
+    # sigreg parameters
+    n_directions: int = field(default=256)
+    n_points: int = field(default=17)
+    lambda_sigreg: float = field(default=1.0)
+
+    # eval parameters
+    n_tasks: int = field(default=5)
+    n_shots: int = field(default=5)
+    n_val: int = field(default=500)
+    eval_data_seed: int = field(default=0)
+
+    # linear probing parameters
+    linear_runs: int = field(default=1)
+    linear_lr: float = field(default=1e-2)
+    linear_l2: float = field(default=1e-4)
+    linear_dropout: float = field(default=0.1)
+
+
+@dataclass
 class ExperimentArgument:
     """Container for a single experiment's data and model configuration."""
 
@@ -276,6 +350,7 @@ MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'GraphGPS': GraphGPSArguments,
     'SSGE': SSGEArguments,
     'SimpleMPNN': SimpleMPNN,
+    'Transfer': TransferArguments,
 }
 
 
