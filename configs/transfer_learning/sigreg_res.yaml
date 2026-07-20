@@ -1,0 +1,72 @@
+MetaArguments:
+  log_file_path: "transfer_learning_SIGReg_residual.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "transfer_learning_SIGReg"
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    LeGraph:
+      model_args:
+        model: "Transfer"
+        encoder: "GCN"
+        hidden_dim: 384
+        n_head: 4
+        n_layers: 2
+        attn_drop: 0.1
+        opt: "adamw"
+        norm: "none"
+        activation: "relu"
+        use_residual: false
+
+        # training parameters
+        scheduler: "cosine"
+        make_undirected: false
+        epochs: 5
+        warmup_steps: -1          # -1 sentinel: warmup = one full epoch
+        peak_lr: 1.0e-3
+        weight_decay: 0.0
+        dropout: 0.2
+        eval_step: 1
+        save_step: 1
+        num_workers: 4
+        device: 0
+
+        # ssl parameters
+        task: "sigreg_res"
+        p_edge_drop: 0.2
+        p_feat_drop: 0.2
+
+        # sigreg parameters
+        n_directions: 256
+        n_points: 17
+        lambda_sigreg: 0.01
+
+        # eval parameters
+        n_tasks: 5
+        n_shots: 5
+        n_val: 500
+        eval_data_seed: 0
+
+        # linear probing parameters
+        linear_runs: 1
+        linear_lr: 1.0e-2
+        linear_l2: 1.0e-4
+        linear_dropout: 0.1
+
+      data_args:
+        data_name: "papers100M"
+        task_name: "node"
+        pretrain_data_size: -1
+        pretrain_data_ids: [-1]
+        eval_data_names:
+          - "cora"
+          - "citeseer"
+          - "wikics"
+          - "dblp"
+          - "pubmed"
+          - "amazon-ratings"
+          - "child"
+          - "photo"
