@@ -41,6 +41,7 @@ from tgfm.evaluation.transfer_eval import (
 )
 from tgfm.models.base_models.base_models import GATNet, GCNNet
 from tgfm.models.pretrain_model.SIGReg import PretrainSIGReg
+from tgfm.models.pretrain_model.sigreg_residual import PretrainSIGRegResidual
 from tgfm.models.pretrain_model.bgrl import PretrainBGRL
 from tgfm.utils.args import (
     DataArguments,
@@ -271,11 +272,13 @@ def get_model(device: torch.device, model_args: TransferArguments) -> torch.nn.M
     else:
         raise ValueError(f'Not implemented: {model_args.encoder}.')
 
-    pretrain_model: Optional[Union[PretrainBGRL, PretrainSIGReg]] = None
+    pretrain_model: Optional[Union[PretrainBGRL, PretrainSIGReg, PretrainSIGRegResidual]] = None
     if model_args.task.lower() == 'sigreg':
         pretrain_model = PretrainSIGReg(encoder, device, model_args)
     elif model_args.task.lower() == 'bgrl':
         pretrain_model = PretrainBGRL(encoder, device, model_args)
+    elif model_args.task.lower() == 'sigreg_res':
+        pretrain_model = PretrainSIGRegResidual(encoder, device, model_args)
     else:
         raise ValueError(f'Not implemented: {model_args.task}.')
 
