@@ -23,7 +23,7 @@ class Universal_Collator(object):
         assert isinstance(args, TransferArguments)
         self.transforms: Optional[BaseTransform] = None
 
-        if self.task in ('grace', 'sigreg', 'bgrl'):
+        if self.task in ('grace', 'sigreg', 'bgrl', 'sigreg_res'):
             t1 = dgl.transforms.FeatMask(node_feat_names=['feat'], p=args.p_feat_drop)
             t2 = dgl.transforms.DropEdge(args.p_edge_drop)
             if args.make_undirected:
