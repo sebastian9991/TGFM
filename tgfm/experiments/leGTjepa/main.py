@@ -22,14 +22,15 @@ from typing import Literal, Tuple
 import torch
 import torch.distributed as dist
 import wandb
-from loss import LeGTJEPALoss
 from torch.distributed.elastic.multiprocessing.errors import record
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import LambdaLR
 from torch_geometric.loader import DataLoader
+from tqdm.auto import tqdm
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from tgfm.models.legtjepa import LeGTJEPA
+from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
 from tgfm.utils.args import (
     LeGTJEPAArguments,
     MetaArguments,
@@ -37,7 +38,7 @@ from tgfm.utils.args import (
     parse_args,
 )
 from tgfm.utils.logger import setup_logging
-from tgfm.utils.path import get_root_dir
+from tgfm.utils.path import get_root_dir, get_scratch
 from tgfm.utils.process import parse_source_data  # from the GraphCLIP repo
 from tgfm.utils.seed import seed_everything
 
@@ -87,9 +88,11 @@ def warmup_cosine(
 
 def load_source_graphs(meta_args: MetaArguments, model_args: ModelArguments) -> list:
     assert isinstance(model_args, LeGTJEPAArguments)
+    scratch = get_scratch()
+    path = scratch / str(meta_args.root_dir) / 'processed'
     graphs: list = []
     for name in model_args.source_data.split('+'):
-        data = torch.load(Path(str(meta_args.root_dir)) / 'processed' / f'{name}.pt')
+        data = torch.load(path / f'{name}.pt')
         graphs.extend(parse_source_data(name, data))
         logging.info(
             f'Loaded source dataset {name} (running total: {len(graphs)} subgraphs)'
@@ -115,7 +118,16 @@ def train_epoch(
     model.train()
     total_loss, num_batches = 0.0, 0
 
-    for step, batch in enumerate(loader):
+    pbar = tqdm(
+        loader,
+        total=len(loader),
+        desc=f'Epoch {epoch}',
+        disable=(global_rank != 0),
+        smoothing=0.1,
+        leave=False,
+    )
+
+    for step, batch in enumerate(pbar):
         optimizer.zero_grad(set_to_none=True)
 
         batch_t = tokenizer(
@@ -137,6 +149,15 @@ def train_epoch(
         num_batches += 1
 
         if global_rank == 0 and (step + 1) % log_every_steps == 0:
+            pbar.set_postfix(
+                {
+                    'loss': f'{losses["loss"].item():.4f}',
+                    'cross': f'{losses["cross"].item():.4f}',
+                    'sg_g': f'{losses["sigreg_graph"].item():.4f}',
+                    'sg_t': f'{losses["sigreg_text"].item():.4f}',
+                    'lr': f'{scheduler.get_last_lr()[0]:.2e}',
+                }
+            )
             logging.info(
                 f'[epoch {epoch} step {step + 1}/{len(loader)}] '
                 f'loss={losses["loss"].item():.4f} '
@@ -247,7 +268,15 @@ def run_legtjepa(
         if global_rank == 0:
             logging.info(f'Resuming from {ckpt_path} at epoch {start_epoch}')
 
-    for epoch in range(start_epoch, model_args.epochs + 1):
+    epoch_pbar = tqdm(
+        range(start_epoch, model_args.epochs + 1),
+        total=model_args.epochs,
+        initial=start_epoch - 1,
+        desc='Epochs',
+        disable=(global_rank != 0),
+    )
+
+    for epoch in epoch_pbar:
         epoch_loss = train_epoch(
             model=model,
             criterion=criterion,
@@ -264,6 +293,7 @@ def run_legtjepa(
         )
 
         if global_rank == 0:
+            epoch_pbar.set_postfix({'epoch_loss': f'{epoch_loss:.4f}'})
             logging.info(f'Epoch: {epoch:02d}, Loss: {epoch_loss:.4f}')
             if verbose:
                 wandb.log({'train/epoch_loss': epoch_loss, 'train/epoch': epoch})
@@ -279,6 +309,7 @@ def run_legtjepa(
                 ckpt_path,
             )
         dist.barrier()
+    epoch_pbar.close()
 
 
 @record
