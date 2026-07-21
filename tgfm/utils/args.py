@@ -106,6 +106,8 @@ class DataArguments:
         default=False,
         metadata={'help': 'Whether to transform dataset.'},
     )
+    test_ratio: float = 0.2
+    eval_seeds: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4])
 
     def __post_init__(self) -> None:
         if self.task_name not in VALID_TASKS:
@@ -284,7 +286,7 @@ class TransferArguments(ModelArguments):
     p_edge_drop: float = field(default=0.2)
     p_feat_drop: float = field(default=0.2)
 
-    #BGRL parameters
+    # BGRL parameters
     bgrl_mm: float = field(default=0.99)
     bgrl_pred_hid: int = field(default=512)
 
@@ -304,6 +306,63 @@ class TransferArguments(ModelArguments):
     linear_lr: float = field(default=1e-2)
     linear_l2: float = field(default=1e-4)
     linear_dropout: float = field(default=0.1)
+
+
+@dataclass
+class LeGTJEPAArguments(ModelArguments):
+    model: str = 'LeGTJEPA'
+
+    # TODO: Make sure the source data is all of what is provided by GraphCLIP repo
+    # --- source data (GraphCLIP layout under data_root) ---
+    source_data: str = 'pubmed'
+    data_root: str = '.'
+    batch_size: int = 900  # per rank; global = batch_size * world_size
+    max_text_length: int = 512
+
+    log_every_steps: int = 100
+
+    # --- graph encoder (GraphGPS, matched to GraphCLIP Base) ---
+    graph_in_dim: int = 384  # SBERT node features
+    graph_hidden_dim: int = 1024
+    graph_num_layers: int = 12
+    graph_pe_dim: int = 8
+    attn_type: str = 'multihead'
+    attn_dropout: float = 0.0
+
+    # --- text encoder ---
+    text_model_id: str = 'sentence-transformers/all-MiniLM-L6-v2'
+    freeze_text_backbone: bool = True  # GraphCLIP-style locked text tower
+    freeze_text_projection: bool = False  # ablation: fully frozen text side
+
+    # --- shared embedding space / projections (LeVLJEPA Sec. 3.2) ---
+    embed_dim: int = 384
+    proj_hidden_dim: int = 2048
+    proj_dropout: float = 0.1
+
+    # --- cross-modal predictors (LeVLJEPA App. A: depth 4, width 2048) ---
+    predictor_depth: int = 4
+    predictor_hidden_dim: int = 2048
+    predictor_dropout: float = 0.1
+
+    # --- objective ---
+    lambda_graph: float = 0.01
+    lambda_text: float = 0.01
+    sigreg_num_slices: int = 256
+    sigreg_num_quad_points: int = 17
+    sigreg_t_max: float = 4.0
+
+    # --- optimization ---
+    lr: float = 1.0e-4
+    weight_decay: float = 1.0e-5
+    epochs: int = 30
+    warmup_steps: int = 1000
+
+    # TODO: Check this
+    # --- evaluation ---
+    # 'text_pred'  : cos(z_g, h_t(z_t))   (LeVLJEPA's reported direction)
+    # 'graph_pred' : cos(h_g(z_g), z_t)
+    # 'direct'     : cos(z_g, z_t)
+    zeroshot_direction: str = 'text_pred'
 
 
 @dataclass
@@ -351,6 +410,7 @@ MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'SSGE': SSGEArguments,
     'SimpleMPNN': SimpleMPNN,
     'Transfer': TransferArguments,
+    'LeGTJEPA': LeGTJEPAArguments,
 }
 
 
