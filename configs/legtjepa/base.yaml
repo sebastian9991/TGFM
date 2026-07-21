@@ -58,6 +58,8 @@ ExperimentArguments:
         zeroshot_direction: 'text_pred'   # text_pred | graph_pred | direct
 
       data_args:
+        data_name: 'source_data'
+        task_name: 'node'
         target_data: 'cora+citeseer+wikics+instagram+photo+computer+history'
         test_ratio: 0.2
         eval_seeds: [0, 1, 2, 3, 4]
