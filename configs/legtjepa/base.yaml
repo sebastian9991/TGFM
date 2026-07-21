@@ -2,7 +2,7 @@ MetaArguments:
   log_file_path: "legtjepa.log"
   node_file: ""
   edge_file: ""
-  root_dir: "legtjepa"
+  root_dir: "graph_clip_datasets"
   is_scratch_location: true
   global_seed: 42
 
@@ -22,7 +22,7 @@ ExperimentArguments:
         graph_hidden_dim: 1024
         graph_num_layers: 12
         graph_pe_dim: 8
-        attn_type: multihead
+        attn_type: 'multihead'
         attn_dropout: 0.0
 
         # --- text encoder (locked tower) ---
@@ -54,7 +54,8 @@ ExperimentArguments:
         warmup_steps: 1000
 
         #Evaluation
-        zeroshot_direction: text_pred   # text_pred | graph_pred | direct
+        #TODO: Check the logic on this
+        zeroshot_direction: 'text_pred'   # text_pred | graph_pred | direct
 
       data_args:
         target_data: 'cora+citeseer+wikics+instagram+photo+computer+history'
