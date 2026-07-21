@@ -76,6 +76,11 @@ class DataArguments:
     data_name: str = field(
         metadata={'help': 'The name of the dataset, needed for pre-built datasets.'},
     )
+    target_data: str = field(
+        metadata={
+            'help': 'The datasets used in target evaluation concatenated by +. As per graphCLIP.'
+        },
+    )
     task_name: str = field(
         metadata={'help': 'The name of the task to train on'},
     )
