@@ -89,9 +89,7 @@ def load_source_graphs(meta_args: MetaArguments, model_args: ModelArguments) -> 
     assert isinstance(model_args, LeGTJEPAArguments)
     graphs: list = []
     for name in model_args.source_data.split('+'):
-        data = torch.load(
-            Path(str(meta_args.root_dir)) / 'processed_data' / f'{name}.pt'
-        )
+        data = torch.load(Path(str(meta_args.root_dir)) / 'processed' / f'{name}.pt')
         graphs.extend(parse_source_data(name, data))
         logging.info(
             f'Loaded source dataset {name} (running total: {len(graphs)} subgraphs)'
@@ -204,6 +202,7 @@ def run_legtjepa(
         logging.info(f'Pre-train loader loaded.')
 
     legtjepa = LeGTJEPA(model_args)
+    # This should be false in all cases, but left for ablations.
     if model_args.freeze_text_projection:
         # The h_t branch is dropped from the loss in this ablation, so the
         # text predictor never receives gradient. Freeze it explicitly —
@@ -213,6 +212,7 @@ def run_legtjepa(
             param.requires_grad = False
     # Projections and predictors use BatchNorm; sync statistics across the
     # per-rank batches so SIGReg sees consistent normalization.
+    # TODO: Check is this learnable? Is it supposed to be?
     legtjepa = torch.nn.SyncBatchNorm.convert_sync_batchnorm(legtjepa)
     legtjepa.to(device=device)
 
