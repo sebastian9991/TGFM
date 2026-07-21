@@ -315,7 +315,6 @@ class LeGTJEPAArguments(ModelArguments):
     # TODO: Make sure the source data is all of what is provided by GraphCLIP repo
     # --- source data (GraphCLIP layout under data_root) ---
     source_data: str = 'pubmed'
-    data_root: str = '.'
     batch_size: int = 900  # per rank; global = batch_size * world_size
     max_text_length: int = 512
 
