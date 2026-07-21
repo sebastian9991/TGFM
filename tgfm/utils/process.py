@@ -23,7 +23,7 @@ def parse_source_data(name: str, data: Data) -> Data:
 
     collected_graph_data = []
     # collected_text_data = []
-    logging.info('process', name)
+    logging.info(f'process {name}')
     for id, jd in enumerate(tqdm(json_data)):
         assert id == jd['id']
         edges = torch.tensor(jd['graph'])
