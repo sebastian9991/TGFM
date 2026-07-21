@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Tuple
 
 import torch
@@ -7,20 +8,22 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
+from tgfm.utils.path import get_scratch
+
 
 def parse_source_data(name: str, data: Data) -> Data:
+    scratch = get_scratch()
+    path = scratch / 'graph_clip_datasets' / 'summary' / f'summary-{name}.json'
     transform = T.AddRandomWalkPE(walk_length=32, attr_name='pe')
     json_data = []
 
-    with open(
-        f'./summary/summary-{name}.json', 'r'
-    ) as fcc_file:  # subgraph-summary pair
+    with open(str(path), 'r') as fcc_file:  # subgraph-summary pair
         fcc_data = json.load(fcc_file)
         json_data = fcc_data
 
     collected_graph_data = []
     # collected_text_data = []
-    print('process', name)
+    logging.info('process', name)
     for id, jd in enumerate(tqdm(json_data)):
         assert id == jd['id']
         edges = torch.tensor(jd['graph'])
@@ -44,6 +47,8 @@ def parse_source_data(name: str, data: Data) -> Data:
 
 
 def parse_target_data(name: str, data: Data) -> Data:
+    scratch = get_scratch()
+    scratch / 'graph_clip_datasets' / 'target_data' / f'{name}.json'
     transform = T.AddRandomWalkPE(walk_length=32, attr_name='pe')
     json_data = []
     with open(f'./target_data/{name}.json', 'r') as fcc_file:
