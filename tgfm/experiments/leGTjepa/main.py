@@ -92,7 +92,7 @@ def load_source_graphs(meta_args: MetaArguments, model_args: ModelArguments) -> 
     path = scratch / str(meta_args.root_dir) / 'processed'
     graphs: list = []
     for name in model_args.source_data.split('+'):
-        data = torch.load(path / f'{name}.pt')
+        data = torch.load(path / f'{name}.pt', weights_only=False)
         graphs.extend(parse_source_data(name, data))
         logging.info(
             f'Loaded source dataset {name} (running total: {len(graphs)} subgraphs)'
