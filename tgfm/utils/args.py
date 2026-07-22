@@ -366,7 +366,16 @@ class LeGTJEPAArguments(ModelArguments):
     # 'text_pred'  : cos(z_g, h_t(z_t))   (LeVLJEPA's reported direction)
     # 'graph_pred' : cos(h_g(z_g), z_t)
     # 'direct'     : cos(z_g, z_t)
+    # 'text_pred+graph_pred' : cos(h_g(z_g), h_t(z_t))
     zeroshot_direction: str = 'text_pred'
+
+    # --- GraphCLIP-style stochasticity
+    graph_aug: bool = False
+    aug_feat_drop: float = 0.3  # GraphCLIP: graph_aug(g, 0.3, 0.2)
+    aug_edge_drop: float = 0.2
+    adversarial: bool = False
+    adv_step_size: float = 1.0e-2  # GraphCLIP: step_size=1e-2, m=3
+    adv_steps: int = 3
 
 
 @dataclass
