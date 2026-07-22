@@ -1,6 +1,6 @@
 import os.path as osp
 import random
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -93,9 +93,9 @@ def get_raw_text_cora(
     use_text: bool = False, seed: int = 0
 ) -> Tuple[Data, Optional[List]]:
     scratch = get_scratch()
-    path = scratch / 'graph_clip_datsets' / 'processed' / 'cora.pt'
-    if osp.exists(str(path)):
-        data = torch.load(path, map_location='cpu')
+    path_pt = scratch / 'graph_clip_datasets' / 'processed' / 'cora.pt'
+    if osp.exists(str(path_pt)):
+        data = torch.load(path_pt, map_location='cpu')
         # data.x = data.x.float() # Half into Float
         edge_index = to_undirected(data.edge_index)
         # edge_index, _ = add_self_loops(data.edge_index)
