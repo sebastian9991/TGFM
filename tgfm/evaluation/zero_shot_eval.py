@@ -92,15 +92,15 @@ def evaluate(
     device: torch.device,
 ) -> float:
     model.eval()
-    if direction == 'text_pred':
+    if direction == 'text_pred' or direction == 'text_pred+graph_pred':
         z_labels = model.text_predictor(z_labels)
-    z_labels = normalize(z_labels, dim=-1)
+    z_labels = normalize(z_labels, dim=-1)  # Normalize for cosine sim
 
     correct, total = 0, 0
     for batch in loader:
         batch = batch.to(device)
         z_g = model.encode_graph(batch)
-        if direction == 'graph_pred':
+        if direction == 'graph_pred' or direction == 'text_pred+graph_pred':
             z_g = model.graph_predictor(z_g)
         z_g = normalize(z_g, dim=-1)
         pred = (z_g @ z_labels.T).argmax(dim=1)
