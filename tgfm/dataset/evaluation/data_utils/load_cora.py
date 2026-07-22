@@ -1,6 +1,6 @@
 import os.path as osp
 import random
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
 import numpy.typing as npt

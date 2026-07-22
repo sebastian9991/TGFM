@@ -1,6 +1,6 @@
 """Code is taken directly from: https://github.com/ZhuYun97/GraphCLIP/tree/main/data."""
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import pandas as pd
 from torch_geometric.data import Data
