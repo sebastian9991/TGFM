@@ -21,8 +21,6 @@ from pathlib import Path
 from typing import List
 
 import torch
-from args import LeGTJEPAArguments, parse_args
-from models import LeGTJEPA
 from torch import Tensor
 from torch.nn.functional import normalize
 from torch_geometric import seed_everything
@@ -30,7 +28,8 @@ from torch_geometric.loader import DataLoader
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from tgfm.dataset.evaluation.load import load_data
-from tgfm.utils.args import parse_args
+from tgfm.models.legtjepa import LeGTJEPA
+from tgfm.utils.args import LeGTJEPAArguments, parse_args
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.process import parse_target_data, split_dataloader
@@ -112,9 +111,9 @@ def main() -> None:
     args = parser.parse_args()
     config_file_path = root / args.config_file
     meta_args, experiment_args = parse_args(config_file_path)
-    for experiment, experiment_arg in experiment_args.items():
-        model_args = experiment_args.model_args
-        data_args = experiment_args.data_args
+    for experiment, experiment_arg in experiment_args.exp_args.items():
+        model_args = experiment_arg.model_args
+        data_args = experiment_arg.data_args
         assert isinstance(model_args, LeGTJEPAArguments)
         setup_logging(meta_args.log_file_path)
 
@@ -123,7 +122,7 @@ def main() -> None:
         )
         model = LeGTJEPA(model_args).to(device)
         ckpt_path = str(
-            Path(meta_args.root_dir) / 'weights' / 'LeGTJEPA' / 'legtjepa.pt'
+            Path(str(meta_args.root_dir)) / 'weights' / 'LeGTJEPA' / 'legtjepa.pt'
         )
         ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
         model.load_state_dict(ckpt['model_state_dict'])
@@ -140,14 +139,14 @@ def main() -> None:
                 c_descs,
                 name,
                 device,
-                data_args.max_text_length,
+                model_args.max_text_length,
             )
 
             accs = []
             for seed in data_args.eval_seeds:
                 seed_everything(seed)
                 _, _, test_loader = split_dataloader(
-                    data, target_graphs, data_args.batch_size, seed=seed, name=name
+                    data, target_graphs, model_args.batch_size, seed=seed, name=name
                 )
                 acc = evaluate(
                     model, test_loader, z_labels, model_args.zeroshot_direction, device
