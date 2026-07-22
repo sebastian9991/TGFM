@@ -1,12 +1,16 @@
 """Code is taken directly from: https://github.com/ZhuYun97/GraphCLIP/tree/main/data."""
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 import pandas as pd
 from torch_geometric.data import Data
 
+from tgfm.utils.path import get_scratch
+
 
 def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[str]]:
+    scratch = get_scratch()
+    path = scratch / 'graph_clip_datasets' / 'processed'
     if dataset == 'cora':
         from tgfm.dataset.evaluation.data_utils.load_cora import (
             get_raw_text_cora as get_raw_text,
@@ -132,7 +136,7 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             get_raw_text_photo as get_raw_text,
         )
 
-        class_desc = pd.read_csv('./processed_data/categories/photo_categories.csv')
+        class_desc = pd.read_csv(f'{str(path)}/photo_categories.csv')
         classes = class_desc['name'].tolist()
         c_descs = class_desc['description'].tolist()
     elif dataset == 'computer':
@@ -140,7 +144,7 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             get_raw_text_computer as get_raw_text,
         )
 
-        class_desc = pd.read_csv('./processed_data/categories/computer_categories.csv')
+        class_desc = pd.read_csv(f'{str(path)}/computer_categories.csv')
         classes = class_desc['name'].tolist()
         c_descs = class_desc['description'].tolist()
     elif dataset == 'history':
@@ -148,7 +152,7 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             get_raw_text_history as get_raw_text,
         )
 
-        class_desc = pd.read_csv('./processed_data/categories/history_categories.csv')
+        class_desc = pd.read_csv(f'{str(path)}/history_categories.csv')
         classes = class_desc['name'].tolist()
         c_descs = class_desc['description'].tolist()
     elif dataset == 'instagram':
