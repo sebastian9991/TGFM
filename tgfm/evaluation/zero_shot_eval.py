@@ -122,7 +122,7 @@ def main() -> None:
         )
         model = LeGTJEPA(model_args).to(device)
         ckpt_path = str(
-            Path(str(meta_args.root_dir)) / 'weights' / 'LeGTJEPA' / 'legtjepa.pt'
+            Path(str(meta_args.root_dir)) / 'weights' / experiment / 'legtjepa.pt'
         )
         ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
         model.load_state_dict(ckpt['model_state_dict'])
