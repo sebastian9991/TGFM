@@ -34,6 +34,9 @@ from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.process import parse_target_data, split_dataloader
 
+# Error when using optimized multi-head attention??
+torch.backends.mha.set_fastpath_enabled(False)
+
 EVAL_TEMPLATE = {
     'cora': 'this paper has a topic on {c}',
     'citeseer': 'good paper of {c} ',
