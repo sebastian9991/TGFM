@@ -8,7 +8,9 @@ from torch_geometric.data import Data
 
 def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[str]]:
     if dataset == 'cora':
-        from data.data_utils.load_cora import get_raw_text_cora as get_raw_text
+        from tgfm.evaluation.data_utils.load_cora import (
+            get_raw_text_cora as get_raw_text,
+        )
 
         # class_map = 'Case Based, Genetic Algorithms, Neural Networks, Probabilistic Methods, Reinforcement Learning, Rule Learning, Theory'
         classes = [
@@ -36,7 +38,9 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             ' which likely refers to research papers that delve into the theoretical aspects of machine learning and artificial intelligence. This includes a broad array of topics such as theoretical foundations of various machine learning algorithms, performance analysis, studies on learning theory, statistical learning, information theory, and optimization methods. Additionally, it could encompass the development of new theoretical frameworks, investigations into the essence of intelligence, the potential for artificial general intelligence, as well as the ethical implications surrounding AI. Essentially, the ""Theory"" category encapsulates papers that primarily focus on theoretical concepts and discussions, contrasting with more application-oriented research which centers on specific techniques and their practical implementation.',
         ]
     elif dataset == 'pubmed':
-        from data.data_utils.load_pubmed import get_raw_text_pubmed as get_raw_text
+        from tgfm.evaluation.data_utils.load_pubmed import (
+            get_raw_text_pubmed as get_raw_text,
+        )
 
         # class_map = 'Experimental induced diabetes, Type 1 diabetes, Type 2 diabetes'
         # class_map = 'Diabetes Mellitus Experimental, Diabetes Mellitus Type1, Diabetes Mellitus Type2'
@@ -51,18 +55,22 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             " which focuses on research related to Type 2 diabetes (T2D), and it can be differentiated from Diabetes Mellitus Type 1 (T1D) in the following ways: Etiology (Cause): Type 2 Diabetes (T2D): T2D is primarily characterized by insulin resistance, where the body's cells do not respond effectively to insulin, and relative insulin deficiency that develops over time. It is not primarily an autoimmune condition.",
         ]
     elif dataset == 'ogbn-arxiv':
-        from data.data_utils.load_arxiv import get_raw_text_arxiv as get_raw_text
+        from tgfm.evaluation.data_utils.load_arxiv import (
+            get_raw_text_arxiv as get_raw_text,
+        )
 
         classes = []
         c_descs = []
 
     elif dataset == 'ogbn-products':
-        from data.data_utils.load_products import get_raw_text_products as get_raw_text
+        from tgfm.evaluation.data_utils.load_products import (
+            get_raw_text_products as get_raw_text,
+        )
 
         classes = []
         c_descs = []
     elif dataset == 'arxiv_2023':
-        from data.data_utils.load_arxiv_2023 import (
+        from tgfm.evaluation.data_utils.load_arxiv_2023 import (
             get_raw_text_arxiv_2023 as get_raw_text,
         )
 
@@ -70,7 +78,9 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
         c_descs = []
 
     elif dataset == 'citeseer':
-        from data.data_utils.load_citeseer import get_raw_text_citeseer as get_raw_text
+        from tgfm.evaluation.data_utils.load_citeseer import (
+            get_raw_text_citeseer as get_raw_text,
+        )
 
         classes = [
             'Agents',
@@ -89,7 +99,9 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             '. Specifically, AI research investigates how to create intelligent systems that can perform tasks that typically require human intelligence, such as perception, reasoning, learning, and decision-making. Researchers in Artificial Intelligence explore diverse techniques such as knowledge representation, planning, and natural language processing to build systems that can solve complex problems, adapt to new environments, and interact with humans.',
         ]
     elif dataset == 'wikics':
-        from data.data_utils.load_wikics import get_raw_text_wikics as get_raw_text
+        from tgfm.evaluation.data_utils.load_wikics import (
+            get_raw_text_wikics as get_raw_text,
+        )
 
         classes = [
             'Computational linguistics',
@@ -116,25 +128,31 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             '. Programming language topics encompass the study of languages used for software development, focusing on syntax, semantics, and implementation. Programming language theory investigates foundational concepts, including type systems, compilers, and language design. Programming language concepts cover key ideas like abstraction, encapsulation, and concurrency, shaping how languages are built and used. Programming language classification categorizes languages based on paradigms (e.g., procedural, functional, object-oriented), syntax, and application domains, aiding in understanding their strengths and weaknesses.',
         ]
     elif dataset == 'photo':
-        from data.data_utils.load_photo import get_raw_text_photo as get_raw_text
+        from tgfm.evaluation.data_utils.load_photo import (
+            get_raw_text_photo as get_raw_text,
+        )
 
         class_desc = pd.read_csv('./processed_data/categories/photo_categories.csv')
         classes = class_desc['name'].tolist()
         c_descs = class_desc['description'].tolist()
     elif dataset == 'computer':
-        from data.data_utils.load_computer import get_raw_text_computer as get_raw_text
+        from tgfm.evaluation.data_utils.load_computer import (
+            get_raw_text_computer as get_raw_text,
+        )
 
         class_desc = pd.read_csv('./processed_data/categories/computer_categories.csv')
         classes = class_desc['name'].tolist()
         c_descs = class_desc['description'].tolist()
     elif dataset == 'history':
-        from data.data_utils.load_history import get_raw_text_history as get_raw_text
+        from tgfm.evaluation.data_utils.load_history import (
+            get_raw_text_history as get_raw_text,
+        )
 
         class_desc = pd.read_csv('./processed_data/categories/history_categories.csv')
         classes = class_desc['name'].tolist()
         c_descs = class_desc['description'].tolist()
     elif dataset == 'instagram':
-        from data.data_utils.load_instagram import (
+        from tgfm.evaluation.data_utils.load_instagram import (
             get_raw_text_instagram as get_raw_text,
         )
 
@@ -144,7 +162,9 @@ def load_data(dataset: str, seed: int = 0) -> Tuple[Data, List, List[str], List[
             ' who leverages the platform to promote products or services, utilizing targeted advertising and engaging content to reach potential customers. Their focus is on brand growth and customer interaction, often employing analytics to refine strategies and enhance reach.',
         ]
     elif dataset == 'reddit':
-        from data.data_utils.load_reddit import get_raw_text_reddit as get_raw_text
+        from tgfm.evaluation.data_utils.load_reddit import (
+            get_raw_text_reddit as get_raw_text,
+        )
 
         classes = ['Normal Users', 'Popular Users']
         c_descs = ['', '']
