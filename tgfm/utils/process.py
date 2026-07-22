@@ -48,10 +48,10 @@ def parse_source_data(name: str, data: Data) -> Data:
 
 def parse_target_data(name: str, data: Data) -> Data:
     scratch = get_scratch()
-    scratch / 'graph_clip_datasets' / 'target_data' / f'{name}.json'
+    path = scratch / 'graph_clip_datasets' / 'target_data' / f'{name}.json'
     transform = T.AddRandomWalkPE(walk_length=32, attr_name='pe')
     json_data = []
-    with open(f'./target_data/{name}.json', 'r') as fcc_file:
+    with open(str(path), 'r') as fcc_file:
         fcc_data = json.load(fcc_file)
         json_data = fcc_data
 
