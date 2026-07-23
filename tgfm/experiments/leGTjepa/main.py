@@ -41,6 +41,7 @@ from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir, get_scratch
 from tgfm.utils.process import parse_source_data  # from the GraphCLIP repo
 from tgfm.utils.seed import seed_everything
+from tgfm.views.augmentations import batch_graph_aug
 
 parser = argparse.ArgumentParser(
     description='Distributed pretraining LeGTJEPA.',
@@ -107,6 +108,7 @@ def train_epoch(
     tokenizer: PreTrainedTokenizerBase,
     optimizer: torch.optim.AdamW,
     scheduler: LambdaLR,
+    model_args: ModelArguments,
     device: torch.device,
     global_rank: int,
     epoch: int,
@@ -115,6 +117,7 @@ def train_epoch(
     verbose: bool,
 ) -> float:
     """One pass over the rank-local shard; returns the epoch's mean loss."""
+    assert isinstance(model_args, LeGTJEPAArguments)
     model.train()
     total_loss, num_batches = 0.0, 0
 
@@ -140,8 +143,29 @@ def train_epoch(
         batch = batch.to(device, non_blocking=True)
         batch_t = {k: v.to(device, non_blocking=True) for k, v in batch_t.items()}
 
-        losses = criterion(model(batch, batch_t))
-        losses['loss'].backward()
+        if model_args.graph_aug:
+            batch = batch_graph_aug(
+                batch, model_args.aug_feat_drop, model_args.aug_edge_drop
+            )
+
+        if not model_args.adversarial:
+            losses = criterion(model(batch, batch_t))
+            losses['loss'].backward()
+        else:
+            m, eps = model_args.adv_steps, model_args.adv_step_size
+            x_clean = batch.x
+            perturb = torch.empty_like(x_clean).uniform_(-eps, eps).requires_grad_()
+            for i in range(m):
+                batch.x = x_clean + perturb
+                losses = criterion(model(batch, batch_t))
+                (losses['loss'] / m).backward()
+                if i < m - 1:
+                    with torch.no_grad():
+                        assert perturb.grad is not None
+                        perturb += eps * perturb.grad.sign()
+                        perturb.grad.zero_()
+            batch.x = x_clean
+
         optimizer.step()
         scheduler.step()
 
@@ -284,6 +308,7 @@ def run_legtjepa(
             tokenizer=tokenizer,
             optimizer=optimizer,
             scheduler=scheduler,
+            model_args=model_args,
             device=device,
             global_rank=global_rank,
             epoch=epoch,
