@@ -14,6 +14,8 @@ from typing import Tuple
 
 import torch
 from torch import Tensor
+from torch_geometric.data import Batch
+from torch_geometric.utils import dropout_edge
 
 
 def drop_edge(edge_index: Tensor, drop_prob: float) -> Tensor:
@@ -57,3 +59,20 @@ def augment(
     edge_index = drop_edge(edge_index, edge_drop_rate)
     x = mask_feature(x, feat_mask_rate)
     return x, edge_index
+
+
+def batch_graph_aug(batch: Batch, feat_drop: float, edge_drop: float) -> Batch:
+    """Per-graph feature-column masking + edge dropout (GraphCLIP graph_aug).
+
+    Mutates the collated batch in place — safe because collation builds fresh
+    tensors each iteration; the underlying pool is untouched.
+    """
+    num_graphs = int(batch.batch.max()) + 1
+    # One column mask per graph, as in GraphCLIP's per-g loop, vectorized:
+    # col_mask[g, f] == True -> feature f zeroed for all nodes of graph g.
+    col_mask = (
+        torch.rand(num_graphs, batch.x.size(1), device=batch.x.device) < feat_drop
+    )
+    batch.x = batch.x.masked_fill(col_mask[batch.batch], 0.0)
+    batch.edge_index, _ = dropout_edge(batch.edge_index, p=edge_drop)
+    return batch
