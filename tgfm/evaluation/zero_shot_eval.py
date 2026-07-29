@@ -18,7 +18,7 @@ parse_target_data / split_dataloader and the eval prompt templates.
 import argparse
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import torch
 from torch import Tensor
@@ -107,6 +107,55 @@ def evaluate(
         correct += (pred == batch.y).sum().item()
         total += batch.y.numel()
     return correct / total
+
+
+@torch.no_grad()
+def zeroshot_macro(
+    model: torch.nn.Module,
+    tokenizer: PreTrainedTokenizerBase,
+    model_args: LeGTJEPAArguments,
+    datasets: List[str],
+    seeds: List[int],
+    device: torch.device,
+    eval_batch_size: int = 256,
+) -> Tuple[float, dict]:
+    """Macro-averaged zero-shot accuracy over target datasets."""
+    was_training = model.training
+    model.eval()
+    per_dataset = {}
+    with torch.random.fork_rng(devices=[device] if device.type == 'cuda' else []):
+        for name in datasets:
+            data, _, classes, c_descs = load_data(name, seed=0)
+            target_graphs = parse_target_data(name, data)
+            z_labels = encode_label_sentences(
+                model,
+                tokenizer,
+                classes,
+                c_descs,
+                name,
+                device,
+                model_args.max_text_length,
+            )
+            accs = []
+            for seed in seeds:
+                seed_everything(seed)
+                _, _, test_loader = split_dataloader(
+                    data, target_graphs, eval_batch_size, seed=seed, name=name
+                )
+                accs.append(
+                    evaluate(
+                        model,
+                        test_loader,
+                        z_labels,
+                        model_args.zeroshot_direction,
+                        device,
+                    )
+                )
+            per_dataset[name] = float(torch.tensor(accs).mean())
+    macro = sum(per_dataset.values()) / len(per_dataset)
+    if was_training:
+        model.train()
+    return macro, per_dataset
 
 
 def main() -> None:
