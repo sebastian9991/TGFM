@@ -42,6 +42,9 @@ class MetaArguments:
         default=False,
         metadata={'help': 'Whether to track metrics with wandb.'},
     )
+    wandb_offline: bool = field(
+        default=True, metadata={'help': 'Whether wandb is offline.'}
+    )
 
     def __post_init__(self) -> None:
         """Resolve all file and directory paths relative to the selected root directory."""
@@ -111,8 +114,11 @@ class DataArguments:
         default=False,
         metadata={'help': 'Whether to transform dataset.'},
     )
-    test_ratio: float = 0.2
+    test_ratio: float = field(default=0.2)
     eval_seeds: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4])
+    eval_seed_sweeps: int = field(default=2)
+    eval_batch_size: int = field(default=256)
+    eval_every_epochs: int = field(default=5)
 
     def __post_init__(self) -> None:
         if self.task_name not in VALID_TASKS:
