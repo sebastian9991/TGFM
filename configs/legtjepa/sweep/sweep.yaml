@@ -1,0 +1,44 @@
+program: tgfm/experiments/legtjepa/main.py
+method: bayes
+metric:
+  # epoch_loss mixes objectives when lambdas are swept (see note below);
+  # switch to train/epoch_cross if you keep lambdas in the search space.
+  name: eval/zeroshot_macro
+  goal: maximize
+
+parameters:
+  lr:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 4.0e-2          # upper end = LeVLJEPA's ViT operating point
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1.0e-6
+    max: 1.0e-3
+  warmup_steps:
+    values: [100, 200, 400]
+  lambda_graph:
+    distribution: log_uniform_values
+    min: 0.005           # LeVLJEPA App. F stable region [0.005, 0.04]
+    max: 0.04
+  lambda_text:
+    distribution: log_uniform_values
+    min: 0.005
+    max: 0.04
+  predictor_depth:
+    values: [2, 3, 4]
+  epochs:
+    value: 10            # sweep budget: ~1h/run at current throughput
+
+early_terminate:
+  type: hyperband
+  min_iter: 1
+
+command:
+  - ${env}
+  - torchrun
+  - --standalone
+  - --nproc_per_node=4
+  - ${program}
+  - --config-file
+  - configs/legtjepa.yaml

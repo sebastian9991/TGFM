@@ -116,7 +116,7 @@ class DataArguments:
     )
     test_ratio: float = field(default=0.2)
     eval_seeds: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4])
-    eval_seed_sweeps: int = field(default=2)
+    eval_seeds_sweep: int = field(default=2)
     eval_batch_size: int = field(default=256)
     eval_every_epochs: int = field(default=5)
 

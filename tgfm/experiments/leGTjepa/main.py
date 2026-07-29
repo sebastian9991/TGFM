@@ -29,9 +29,11 @@ from torch_geometric.loader import DataLoader
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
+from tgfm.evaluation.zero_shot_eval import zeroshot_macro
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
 from tgfm.utils.args import (
+    DataArguments,
     LeGTJEPAArguments,
     MetaArguments,
     ModelArguments,
@@ -109,6 +111,7 @@ def train_epoch(
     optimizer: torch.optim.AdamW,
     scheduler: LambdaLR,
     model_args: ModelArguments,
+    data_args: DataArguments,
     device: torch.device,
     global_rank: int,
     epoch: int,
@@ -172,6 +175,33 @@ def train_epoch(
         total_loss += losses['loss'].detach().item()
         num_batches += 1
 
+        if (
+            global_rank == 0
+            and epoch % data_args.eval_every_epochs == 0
+            or epoch == model_args.epochs
+        ):
+            if verbose:
+                logging.info('Evaluation Model.')
+                macro, per_ds = zeroshot_macro(
+                    model.module,
+                    tokenizer,
+                    model_args,
+                    datasets=data_args.target_data.split('+'),
+                    seeds=list(range(data_args.eval_seeds_sweep)),
+                    device=device,
+                    eval_batch_size=data_args.eval_batch_size,
+                )
+                logging.info(f'[epoch {epoch}] zeroshot_macro={100 * macro:2f}')
+                logging.info(f'{ {k: f"{100 * v::.2f}" for k, v in per_ds.items()} }')
+
+                wandb.log(
+                    {
+                        'eval/zeroshot_macro': macro,
+                        **{f'eval/zeroshot_{k}': v for k, v in per_ds.items()},
+                    }
+                )
+            dist.barrier()
+
         if global_rank == 0 and (step + 1) % log_every_steps == 0:
             pbar.set_postfix(
                 {
@@ -210,6 +240,7 @@ def train_epoch(
 
 def run_legtjepa(
     model_args: ModelArguments,
+    data_args: DataArguments,
     graphs: list,
     tokenizer: PreTrainedTokenizerBase,
     save_dir: Path,
@@ -309,6 +340,7 @@ def run_legtjepa(
             optimizer=optimizer,
             scheduler=scheduler,
             model_args=model_args,
+            data_args=data_args,
             device=device,
             global_rank=global_rank,
             epoch=epoch,
@@ -346,9 +378,19 @@ def main() -> None:
         args = parser.parse_args()
         config_file_path = root / args.config_file
         meta_args, experiment_args = parse_args(config_file_path)
-        if meta_args.verbose and global_rank == 0:
+
+        sweep_id = os.environ.get('WANDB_SWEEP_ID')
+        use_wandb = meta_args.verbose or sweep_id is not None
+
+        payload: list = [{}, '']
+
+        if use_wandb and global_rank == 0:
             mode: Literal['online', 'offline'] = (
-                'offline' if getattr(meta_args, 'wandb_offline', True) else 'online'
+                'online'
+                if sweep_id is not None
+                else (
+                    'offline' if getattr(meta_args, 'wand_offline', True) else 'online'
+                )
             )
             wandb.init(
                 project=getattr(meta_args, 'wandb_project', 'legtjepa-pretrain'),
@@ -360,6 +402,12 @@ def main() -> None:
                 mode=mode,
             )
             time.sleep(5)  # Helpful for a potential 409 error on wandb servers.
+            assert wandb.run is not None
+            payload = [dict(wandb.config), wandb.run.id]
+
+        if sweep_id is not None:
+            dist.broadcast_object_list(payload, src=0)
+        sweep_overrides, run_id = payload
 
         seed_everything(meta_args.global_seed)
 
@@ -374,21 +422,33 @@ def main() -> None:
             if global_rank == 0:
                 logging.info(f'\n***Running*** {experiment}')
             model_args = experiment_arg.model_args
+            data_args = experiment_arg.data_args
             assert isinstance(model_args, LeGTJEPAArguments)
+
+            for key, value in sweep_overrides.items():
+                if hasattr(model_args, key):
+                    setattr(model_args, key, value)
+                elif global_rank == 0 and key not in ('world_size', 'global_seed'):
+                    logging.warning(
+                        f'sweep override {key!r} is not a model field; ignored.'
+                    )
+
+            exp_name = f'{experiment}--{run_id}' if sweep_id is not None else experiment
 
             tokenizer = AutoTokenizer.from_pretrained(model_args.text_model_id)
             graphs = load_source_graphs(meta_args, model_args)
 
             run_legtjepa(
                 model_args=model_args,
+                data_args=data_args,
                 graphs=graphs,
                 tokenizer=tokenizer,
-                save_dir=root_dir / 'weights' / experiment,
+                save_dir=root_dir / 'weights' / exp_name,
                 local_rank=local_rank,
                 global_rank=global_rank,
                 world_size=world_size,
                 device=device,
-                verbose=meta_args.verbose,
+                verbose=use_wandb,
             )
     finally:
         cleanup_distributed()
