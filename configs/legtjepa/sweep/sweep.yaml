@@ -36,9 +36,5 @@ early_terminate:
 
 command:
   - ${env}
-  - torchrun
-  - --standalone
-  - --nproc_per_node=4
-  - ${program}
-  - --config-file
-  - configs/legtjepa.yaml
+  - bash
+  - bash_scripts/sweeps/sweep.sh
