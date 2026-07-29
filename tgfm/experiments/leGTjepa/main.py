@@ -192,7 +192,7 @@ def train_epoch(
                     eval_batch_size=data_args.eval_batch_size,
                 )
                 logging.info(f'[epoch {epoch}] zeroshot_macro={100 * macro:2f}')
-                logging.info(f'{ {k: f"{100 * v::.2f}" for k, v in per_ds.items()} }')
+                logging.info(f'{ {k: f"{100 * v:.2f}" for k, v in per_ds.items()} }')
 
                 wandb.log(
                     {
@@ -381,6 +381,11 @@ def main() -> None:
 
         sweep_id = os.environ.get('WANDB_SWEEP_ID')
         use_wandb = meta_args.verbose or sweep_id is not None
+        assert (
+            meta_args.verbose == True
+            if sweep_id is not None
+            else meta_args.verbose == True or meta_args.verbose == False
+        )
 
         payload: list = [{}, '']
 
