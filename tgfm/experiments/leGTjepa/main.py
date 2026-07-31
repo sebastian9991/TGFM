@@ -178,28 +178,6 @@ def train_epoch(
         total_loss += losses['loss'].detach().item()
         num_batches += 1
 
-        if epoch % data_args.eval_every_epochs == 0 or epoch == model_args.epochs:
-            if verbose and global_rank == 0:
-                macro, per_ds = zeroshot_macro(
-                    model.module,
-                    tokenizer,
-                    model_args,
-                    datasets=data_args.target_data.split('+'),
-                    seeds=list(range(data_args.eval_seeds_sweep)),
-                    device=device,
-                    eval_batch_size=data_args.eval_batch_size,
-                )
-                logging.info(f'[epoch {epoch}] zeroshot_macro={100 * macro:2f}')
-                logging.info(f'{ {k: f"{100 * v:.2f}" for k, v in per_ds.items()} }')
-
-                wandb.log(
-                    {
-                        'eval/zeroshot_macro': macro,
-                        **{f'eval/zeroshot_{k}': float(v) for k, v in per_ds.items()},
-                    }
-                )
-            dist.barrier(group=cpu_pg)
-
         if global_rank == 0 and (step + 1) % log_every_steps == 0:
             pbar.set_postfix(
                 {
@@ -211,12 +189,12 @@ def train_epoch(
                 }
             )
             logging.info(
-                f'[epoch {epoch} step {step + 1}/{len(loader)}] '
+                f"[epoch {epoch} step {step + 1}/{len(loader)}] "
                 f'loss={losses["loss"].item():.4f} '
                 f'cross={losses["cross"].item():.4f} '
                 f'sigreg_g={losses["sigreg_graph"].item():.4f} '
                 f'sigreg_t={losses["sigreg_text"].item():.4f} '
-                f'lr={scheduler.get_last_lr()[0]:.2e}'
+                f"lr={scheduler.get_last_lr()[0]:.2e}"
             )
             if verbose:
                 wandb.log(
@@ -365,7 +343,28 @@ def run_legtjepa(
                 },
                 ckpt_path,
             )
-        dist.barrier()
+        if epoch % data_args.eval_every_epochs == 0 or epoch == model_args.epochs:
+            if verbose and global_rank == 0:
+                macro, per_ds = zeroshot_macro(
+                    model.module,
+                    tokenizer,
+                    model_args,
+                    datasets=data_args.target_data.split('+'),
+                    seeds=list(range(data_args.eval_seeds_sweep)),
+                    device=device,
+                    eval_batch_size=data_args.eval_batch_size,
+                )
+                logging.info(f'[epoch {epoch}] zeroshot_macro={100 * macro:2f}')
+                logging.info(f'{ {k: f"{100 * v:.2f}" for k, v in per_ds.items()} }')
+
+                wandb.log(
+                    {
+                        'eval/zeroshot_macro': macro,
+                        **{f'eval/zeroshot_{k}': float(v) for k, v in per_ds.items()},
+                        'train/epoch': epoch,
+                    }
+                )
+        dist.barrier(group=cpu_pg)
     epoch_pbar.close()
 
 
