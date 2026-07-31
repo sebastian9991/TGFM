@@ -175,11 +175,7 @@ def train_epoch(
         total_loss += losses['loss'].detach().item()
         num_batches += 1
 
-        if (
-            global_rank == 0
-            and epoch % data_args.eval_every_epochs == 0
-            or epoch == model_args.epochs
-        ):
+        if epoch % data_args.eval_every_epochs == 0 or epoch == model_args.epochs:
             if verbose:
                 logging.info('Evaluation Model.')
                 macro, per_ds = zeroshot_macro(
