@@ -192,7 +192,7 @@ def train_epoch(
                 wandb.log(
                     {
                         'eval/zeroshot_macro': macro,
-                        **{f'eval/zeroshot_{k}': v for k, v in per_ds.items()},
+                        **{f'eval/zeroshot_{k}': float(v) for k, v in per_ds.items()},
                     }
                 )
             dist.barrier()
