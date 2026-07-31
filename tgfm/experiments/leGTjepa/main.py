@@ -16,6 +16,7 @@ import logging
 import math
 import os
 import time
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal, Tuple
 
@@ -44,6 +45,8 @@ from tgfm.utils.path import get_root_dir, get_scratch
 from tgfm.utils.process import parse_source_data  # from the GraphCLIP repo
 from tgfm.utils.seed import seed_everything
 from tgfm.views.augmentations import batch_graph_aug
+
+cpu_pg = dist.new_group(backend='gloo', timeout=timedelta(hours=1))
 
 parser = argparse.ArgumentParser(
     description='Distributed pretraining LeGTJEPA.',
@@ -176,16 +179,16 @@ def train_epoch(
         num_batches += 1
 
         if epoch % data_args.eval_every_epochs == 0 or epoch == model_args.epochs:
-            macro, per_ds = zeroshot_macro(
-                model.module,
-                tokenizer,
-                model_args,
-                datasets=data_args.target_data.split('+'),
-                seeds=list(range(data_args.eval_seeds_sweep)),
-                device=device,
-                eval_batch_size=data_args.eval_batch_size,
-            )
             if verbose and global_rank == 0:
+                macro, per_ds = zeroshot_macro(
+                    model.module,
+                    tokenizer,
+                    model_args,
+                    datasets=data_args.target_data.split('+'),
+                    seeds=list(range(data_args.eval_seeds_sweep)),
+                    device=device,
+                    eval_batch_size=data_args.eval_batch_size,
+                )
                 logging.info(f'[epoch {epoch}] zeroshot_macro={100 * macro:2f}')
                 logging.info(f'{ {k: f"{100 * v:.2f}" for k, v in per_ds.items()} }')
 
@@ -195,7 +198,7 @@ def train_epoch(
                         **{f'eval/zeroshot_{k}': float(v) for k, v in per_ds.items()},
                     }
                 )
-            dist.barrier()
+            dist.barrier(group=cpu_pg)
 
         if global_rank == 0 and (step + 1) % log_every_steps == 0:
             pbar.set_postfix(
