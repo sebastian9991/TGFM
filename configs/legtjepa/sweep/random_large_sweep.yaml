@@ -1,0 +1,89 @@
+program: tgfm/experiments/legtjepa/main.py
+method: random
+entity: reihaneh-rabbany
+project: legtjepa-pretrain     # otherwise wandb auto-names and ignores yours
+metric:
+  name: eval/zeroshot_macro
+  goal: maximize
+
+parameters:
+  # ---- optimization ----
+  lr:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 5.0e-3          # 4e-2 is LeVLJEPA's ViT point; GPS diverges well below it
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1.0e-6
+    max: 1.0e-2
+  warmup_steps:
+    values: [50, 100, 200]   # 1290 total steps at 10 epochs — 400 was 31% of training
+  batch_size:
+    values: [450, 900, 1800] # per rank; also rescales steps/epoch and SIGReg's batch
+
+  # ---- objective ----
+  lambda_graph:
+    distribution: log_uniform_values
+    min: 0.005           # LeVLJEPA App. F stable region [0.005, 0.04]
+    max: 0.04
+  lambda_text:
+    distribution: log_uniform_values
+    min: 0.005
+    max: 0.04
+  sigreg_num_slices:
+    values: [128, 256, 512]
+
+  # ---- predictors / projections ----
+  predictor_depth:
+    values: [2, 3, 4]
+  predictor_hidden_dim:
+    values: [1024, 2048, 4096]
+  predictor_dropout:
+    distribution: uniform
+    min: 0.0
+    max: 0.2
+  proj_hidden_dim:
+    values: [1024, 2048]
+  proj_dropout:
+    distribution: uniform
+    min: 0.0
+    max: 0.2
+  embed_dim:
+    values: [256, 384, 768]
+
+  # ---- graph encoder ----
+  graph_num_layers:
+    values: [6, 8, 12]
+  graph_hidden_dim:
+    values: [512, 768, 1024]
+  graph_pe_dim:
+    values: [8, 16, 32]
+  attn_dropout:
+    values: [0.0, 0.1]
+
+  # ---- augmentation: always on, 0.0 encodes "off" ----
+  # A boolean flag plus dependent rates wastes bayes samples on inactive
+  # dimensions; folding "off" into the rate keeps the space continuous.
+  graph_aug:
+    value: true
+  aug_feat_drop:
+    distribution: uniform
+    min: 0.0
+    max: 0.5             # GraphCLIP: 0.3
+  aug_edge_drop:
+    distribution: uniform
+    min: 0.0
+    max: 0.4             # GraphCLIP: 0.2
+
+  epochs:
+    value: 10
+
+early_terminate:
+  type: hyperband
+  min_iter: 1
+  eta: 3
+
+command:
+  - ${env}
+  - bash
+  - bash_scripts/sweeps/sweep.sh
