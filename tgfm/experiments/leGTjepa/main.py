@@ -46,8 +46,6 @@ from tgfm.utils.process import parse_source_data  # from the GraphCLIP repo
 from tgfm.utils.seed import seed_everything
 from tgfm.views.augmentations import batch_graph_aug
 
-cpu_pg = dist.new_group(backend='gloo', timeout=timedelta(hours=1))
-
 parser = argparse.ArgumentParser(
     description='Distributed pretraining LeGTJEPA.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -57,7 +55,7 @@ parser.add_argument(
 )
 
 
-def setup_distributed() -> Tuple[int, int, int, torch.device]:
+def setup_distributed() -> Tuple[int, int, int, torch.device, dist.ProcessGroup]:
     """Set up distributed backend, get ranks, world size."""
     assert torch.cuda.is_available() and torch.cuda.device_count() > 0
     assert torch.distributed.is_available()
@@ -72,7 +70,8 @@ def setup_distributed() -> Tuple[int, int, int, torch.device]:
 
     torch.cuda.set_device(local_rank)
     device = torch.device(f'cuda:{local_rank}')
-    return local_rank, global_rank, world_size, device
+    cpu_pg = dist.new_group(backend='gloo', timeout=timedelta(hours=1))
+    return local_rank, global_rank, world_size, device, cpu_pg
 
 
 def cleanup_distributed() -> None:
@@ -116,6 +115,7 @@ def train_epoch(
     model_args: ModelArguments,
     data_args: DataArguments,
     device: torch.device,
+    cpu_pg: dist.ProcessGroup,
     global_rank: int,
     epoch: int,
     log_every_steps: int,
@@ -246,6 +246,7 @@ def run_legtjepa(
     global_rank: int,
     world_size: int,
     device: torch.device,
+    cpu_pg: dist.ProcessGroup,
     verbose: bool = False,
 ) -> None:
     assert isinstance(model_args, LeGTJEPAArguments)
@@ -340,6 +341,7 @@ def run_legtjepa(
             model_args=model_args,
             data_args=data_args,
             device=device,
+            cpu_pg=cpu_pg,
             global_rank=global_rank,
             epoch=epoch,
             log_every_steps=model_args.log_every_steps,
@@ -369,7 +371,7 @@ def run_legtjepa(
 
 @record
 def main() -> None:
-    local_rank, global_rank, world_size, device = setup_distributed()
+    local_rank, global_rank, world_size, device, cpu_pg = setup_distributed()
 
     try:
         root = get_root_dir()
@@ -451,6 +453,7 @@ def main() -> None:
                 global_rank=global_rank,
                 world_size=world_size,
                 device=device,
+                cpu_pg=cpu_pg,
                 verbose=use_wandb,
             )
     finally:
