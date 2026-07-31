@@ -176,17 +176,16 @@ def train_epoch(
         num_batches += 1
 
         if epoch % data_args.eval_every_epochs == 0 or epoch == model_args.epochs:
-            if verbose:
-                logging.info('Evaluation Model.')
-                macro, per_ds = zeroshot_macro(
-                    model.module,
-                    tokenizer,
-                    model_args,
-                    datasets=data_args.target_data.split('+'),
-                    seeds=list(range(data_args.eval_seeds_sweep)),
-                    device=device,
-                    eval_batch_size=data_args.eval_batch_size,
-                )
+            macro, per_ds = zeroshot_macro(
+                model.module,
+                tokenizer,
+                model_args,
+                datasets=data_args.target_data.split('+'),
+                seeds=list(range(data_args.eval_seeds_sweep)),
+                device=device,
+                eval_batch_size=data_args.eval_batch_size,
+            )
+            if verbose and global_rank == 0:
                 logging.info(f'[epoch {epoch}] zeroshot_macro={100 * macro:2f}')
                 logging.info(f'{ {k: f"{100 * v:.2f}" for k, v in per_ds.items()} }')
 
