@@ -1,0 +1,65 @@
+MetaArguments:
+  log_file_path: "legtjepa.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "graph_clip_datasets"
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    LeGraph:
+      model_args:
+        model: "LeGTJEPA"
+        source_data: "ogbn-arxiv+arxiv_2023+pubmed+ogbn-products+reddit"
+        batch_size: 900            # per rank; 8 ranks => global 7200 (GraphCLIP's run)
+        max_text_length: 512
+
+        log_every_steps: 100
+
+        # --- graph encoder (GraphCLIP Base: GraphGPS, 12 layers, hidden 1024) ---
+        graph_in_dim: 384
+        graph_hidden_dim: 1024
+        graph_num_layers: 12
+        graph_pe_dim: 8
+        attn_type: 'multihead'
+        attn_dropout: 0.0
+
+        # --- text encoder (locked tower) ---
+        text_model_id: 'sentence-transformers/all-MiniLM-L6-v2'
+        freeze_text_backbone: true
+        freeze_text_projection: false   # true => fully frozen text side (ablation)
+
+        # --- shared space and predictors (LeVLJEPA Sec. 3.2 / App. A) ---
+        embed_dim: 384
+        proj_hidden_dim: 2048
+        proj_dropout: 0.1
+        predictor_depth: 4
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.1
+
+        # --- objective (LeVLJEPA App. A: lambda_v = lambda_t = 0.01) ---
+        lambda_graph: 0.01
+        lambda_text: 0.01
+        sigreg_num_slices: 256
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+
+        # --- optimization ---
+        # LeVLJEPA's 4e-2 is tuned for ViT + AdamW at batch 4096 on images;
+        # start conservative for GraphGPS and sweep {1e-4, 5e-4, 1e-3, 4e-2}.
+        lr: 1.0e-4
+        weight_decay: 1.0e-5
+        epochs: 30                 # GraphCLIP pretrains for 30 epochs
+        warmup_steps: 1000
+
+        #Evaluation
+        #TODO: Check the logic on this
+        zeroshot_direction: 'text_pred'   # text_pred | graph_pred | direct
+
+      data_args:
+        data_name: 'source_data'
+        task_name: 'node'
+        target_data: 'cora+citeseer+wikics+instagram+photo+computer+history'
+        test_ratio: 0.2
+        eval_seeds: [0, 1, 2, 3, 4]

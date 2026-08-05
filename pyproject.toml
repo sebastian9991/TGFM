@@ -29,7 +29,28 @@ dev = [
     "types-pyyaml>=6.0.12.20260510",
     "types-requests>=2.33.0.20260513",
 ]
-transfer = ["torch==2.4.0", "dgl==2.4.0+cu121"]
+transfer = ["torch==2.4.0", "dgl==2.4.0+cu121", "pyg-lib",
+    "torch-scatter==2.1.2",
+    "torch-sparse==0.6.18"]
+
+graphclip = [
+    "torch==2.4.1",
+    "torchvision==0.19.1",
+    "torchaudio==2.4.1",
+    "pyg-lib",
+    "torch-scatter==2.1.2",
+    "torch-sparse==0.6.18",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu121", group = "graphclip" }]
+torchvision = [{ index = "pytorch-cu121", group = "graphclip" }]
+torchaudio = [{ index = "pytorch-cu121", group = "graphclip" }]
 
 [tool.flit.module]
 name = "tgfm"
@@ -39,8 +60,12 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [tool.uv]
-conflicts = [[{ group = "transfer" }, { group = "core" }]]
-find-links = ["https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html"]
+conflicts = [
+    [{ group = "transfer" }, { group = "core" }],
+    [{ group = "graphclip" }, { group = "core" }],
+    [{ group = "graphclip" }, { group = "transfer" }],
+]
+find-links = ["https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html", "https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html", "https://data.pyg.org/whl/torch-2.4.1+cu121.html"]
 environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 
 

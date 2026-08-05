@@ -76,7 +76,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: uv run mypy
+        entry: uv run --no-sync mypy
         language: system
         types_or: [python, pyi]
         files: ^tgfm/
