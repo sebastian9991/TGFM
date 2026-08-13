@@ -1,0 +1,94 @@
+program: tgfm/experiments/transfer_learning/legtjepa_main.py
+method: random
+entity: reihaneh-rabbany
+project: legtjepa-gstbench
+metric:
+  # Cross-domain, not the all-dataset macro: papers100M is academic citation
+  # data, so cora/citeseer/pubmed/dblp partly reward domain overlap rather
+  # than transfer. amazon-ratings / child / photo / wikics are the honest test.
+  name: eval/cross_domain_val
+  goal: maximize
+
+parameters:
+  # ---- optimization ----
+  peak_lr:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 5.0e-3          # 1e-3 degraded the earlier SIGReg transfer run
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1.0e-6
+    max: 1.0e-2
+  warmup_steps:
+    values: [100, 300, 1000]   # -1 (= one full epoch) is 33% of a 3-epoch run
+  opt:
+    values: [adamw, adam]
+
+  # ---- shared encoder ----
+  # Keep GCN fixed for the search: GAT changes params-per-hidden-dim and the
+  # arm-to-arm comparison against SIGReg/BGRL assumes one backbone.
+  encoder:
+    value: GCN
+  hidden_dim:
+    values: [384, 512, 768]
+  n_layers:
+    values: [2, 3, 4]
+  dropout:
+    distribution: uniform
+    min: 0.0
+    max: 0.4
+  norm:
+    values: [none, batchnorm, layernorm]
+  use_residual:
+    values: [true, false]
+
+  # ---- cross-modal heads (LeVLJEPA Sec. 3.2 / App. A) ----
+  embed_dim:
+    values: [256, 384, 768]
+  proj_hidden_dim:
+    values: [1024, 2048]
+  proj_dropout:
+    distribution: uniform
+    min: 0.0
+    max: 0.2
+  predictor_depth:
+    values: [2, 3, 4]
+  predictor_hidden_dim:
+    values: [1024, 2048, 4096]
+  predictor_dropout:
+    distribution: uniform
+    min: 0.0
+    max: 0.2
+
+  # ---- objective ----
+  lambda_graph:
+    distribution: log_uniform_values
+    min: 0.005           # LeVLJEPA App. F stable region [0.005, 0.04]
+    max: 0.04
+  lambda_text:
+    distribution: log_uniform_values
+    min: 0.005
+    max: 0.04
+  sigreg_num_slices:
+    values: [128, 256, 512]
+
+  # ---- budget: fixed, not searched ----
+  # ~11k steps/epoch on the full pool = 2h. The config subsamples the
+  # pretraining pool (pretrain_data_size) so a trial lands near an hour;
+  # retrain the winner on the full pool before reporting anything.
+  epochs:
+    value: 3
+  eval_every_steps:
+    value: 700           # ~3 rungs/epoch so hyperband has something to prune on
+  log_step:
+    value: 100
+
+early_terminate:
+  type: hyperband
+  min_iter: 2
+  eta: 3
+
+command:
+  - ${env}
+  - bash
+  - bash_scripts/sweeps/gstbench_legtjepa_sweep.sh

@@ -1,0 +1,84 @@
+MetaArguments:
+  log_file_path: "transfer_learning_LeGTJEPA.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "transfer_learning_SIGReg"
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    LeGTJEPA_transfer:
+      model_args:
+        model: "Transfer"
+        encoder: "GCN"
+        hidden_dim: 384
+        n_head: 4
+        n_layers: 2
+        attn_drop: 0.1
+        opt: "adamw"
+        norm: "none"
+        activation: "relu"
+        use_residual: false
+
+        # training parameters
+        scheduler: "cosine"
+        make_undirected: false
+        epochs: 5
+        warmup_steps: -1          # -1 sentinel: warmup = one full epoch
+        peak_lr: 1.0e-4           # 1e-3 degraded the earlier SIGReg transfer run
+        weight_decay: 1.0e-5
+        dropout: 0.2
+        eval_step: 1
+        save_step: 1
+        num_workers: 4
+        device: 0
+
+        # ssl parameters
+        task: "legtjepa"
+        p_edge_drop: 0.0          # single clean view; the pair is cross-modal
+        p_feat_drop: 0.0
+
+        # cross-modal heads (LeVLJEPA Sec. 3.2 / App. A)
+        text_input_dim: 384       # raw MiniLM node features = the text modality
+        embed_dim: 384            # shared space where SIGReg is computed
+        proj_hidden_dim: 2048
+        proj_dropout: 0.1
+        predictor_depth: 4
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.1
+        freeze_text_projection: false   # true = fully locked text tower (ablation)
+
+        # objective
+        lambda_graph: 0.01        # LeVLJEPA App. F stable region [0.005, 0.04]
+        lambda_text: 0.01
+        sigreg_num_slices: 256
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+
+        # eval parameters
+        n_tasks: 20
+        n_shots: 5
+        n_val: 500
+        eval_data_seed: 0
+
+        # linear probing parameters
+        linear_runs: 1
+        linear_lr: 1.0e-2
+        linear_l2: 1.0e-4
+        linear_dropout: 0.1
+
+      data_args:
+        data_name: "papers100M"
+        task_name: "node"
+        pretrain_data_size: -1
+        pretrain_data_ids: [-1]
+        eval_data_names:
+          - "cora"
+          - "citeseer"
+          - "wikics"
+          - "dblp"
+          - "pubmed"
+          - "amazon-ratings"
+          - "child"
+          - "photo"
