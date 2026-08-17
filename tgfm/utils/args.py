@@ -30,6 +30,9 @@ class MetaArguments:
             'help': 'A csv or list of csv files containing the nodes of the graph.'
         },
     )
+    wandb_sweep_id: str = field(
+        metadata={'help': 'The sweep id for evaluation on wandb sweep weights.'}
+    )
     global_seed: int = field(
         default=42,
         metadata={'help': 'Random seed to use for reproducibiility.'},
@@ -44,9 +47,6 @@ class MetaArguments:
     )
     wandb_offline: bool = field(
         default=True, metadata={'help': 'Whether wandb is offline.'}
-    )
-    wandb_sweep_id: str = field(
-        metadata={'help': 'The sweep id for evaluation on wandb sweep weights.'}
     )
 
     def __post_init__(self) -> None:
