@@ -135,12 +135,20 @@ def build_model(
         return model, AutoTokenizer.from_pretrained(tokenizer_id), 'direct'
 
     model = LeGTJEPA(model_args).to(device)
-    ckpt_path = (
-        Path(str(meta_args.root_dir))
-        / 'weights'
-        / f'{experiment}--{meta_args.wandb_sweep_id}'
-        / 'legtjepa.pt'
-    )
+    if meta_args.wandb_sweep_id is not None:
+        ckpt_path = (
+            Path(str(meta_args.root_dir))
+            / 'weights'
+            / f'{experiment}--{meta_args.wandb_sweep_id}'
+            / 'legtjepa.pt'
+        )
+    else:
+        ckpt_path = (
+            Path(str(meta_args.root_dir))
+            / 'weights'
+            / experiment
+            / 'legtjepa.pt'
+        )
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
