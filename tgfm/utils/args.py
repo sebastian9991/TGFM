@@ -30,8 +30,9 @@ class MetaArguments:
             'help': 'A csv or list of csv files containing the nodes of the graph.'
         },
     )
-    wandb_sweep_id: str = field(
-        metadata={'help': 'The sweep id for evaluation on wandb sweep weights.'}
+    wandb_sweep_id: Optional[str] = field(
+        default=None,
+        metadata={'help': 'The sweep id for evaluation on wandb sweep weights.'},
     )
     global_seed: int = field(
         default=42,
