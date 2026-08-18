@@ -486,7 +486,7 @@ def pretrain(
         mode: Literal['online', 'offline'] = (
             'online'
             if sweep_id is not None
-            else ('offline' if getattr(meta_args, 'wandb_offline', True) else 'online')
+            else ('online' if getattr(meta_args, 'wandb_offline', True) else 'online')
         )
         wandb.init(
             project=getattr(meta_args, 'wandb_project', 'legtjepa-gstbench'),
