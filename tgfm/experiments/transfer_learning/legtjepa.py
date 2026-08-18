@@ -39,7 +39,7 @@ import gc
 import logging
 import os
 import os.path
-import random
+import socket
 import time
 from copy import deepcopy
 from pathlib import Path
@@ -97,6 +97,15 @@ parser.add_argument('--num_gpus', type=int, default=1, help='Number of GPUs on n
 
 def macro(values: Sequence[float]) -> float:
     return float(sum(values) / len(values)) if values else float('nan')
+
+
+def find_free_port() -> int:
+    """Ephemeral port from the OS. `random` is seeded by seed_everything, so
+    random.randint would hand every concurrent run the same port.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('', 0))
+        return int(sock.getsockname()[1])
 
 
 def report_downstream(
@@ -647,7 +656,7 @@ def main() -> None:
     for experiment, experiment_arg in experiment_args.exp_args.items():
         ckpt_path = root_dir / 'weights' / f'ckpt-{experiment}'
         ckpt_path.mkdir(parents=True, exist_ok=True)
-        port = random.randint(10000, 65535)
+        port = find_free_port()
         mp.spawn(
             pretrain,
             args=(
