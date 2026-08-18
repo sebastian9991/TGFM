@@ -4,6 +4,7 @@ All functions are taken from GSTBench's eval_helper.py, trimmed to the linear
 probing path only. eval_downstream now reports LINEAR results exclusively.
 """
 
+import logging
 import os
 import pickle
 from collections import defaultdict
@@ -15,6 +16,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+from tqdm import tqdm
 
 from tgfm.utils.args import ModelArguments, TransferArguments
 from tgfm.utils.seed import seed_everything
@@ -191,7 +193,7 @@ def get_linear_results(
         val_acc_list.append(val_acc)
         test_acc_list.append(test_acc)
 
-    return np.mean(val_acc_list), np.mean(test_acc_list)
+    return float(np.mean(val_acc_list)), float(np.mean(test_acc_list))
 
 
 def train_clf(
@@ -281,10 +283,10 @@ def get_mean_linear_results(
         test_acc_list.append(test_acc)
 
     return (
-        np.mean(val_acc_list),
-        np.std(val_acc_list),
-        np.mean(test_acc_list),
-        np.std(test_acc_list),
+        float(np.mean(val_acc_list)),
+        float(np.std(val_acc_list)),
+        float(np.mean(test_acc_list)),
+        float(np.std(test_acc_list)),
     )
 
 
@@ -297,7 +299,8 @@ def eval_downstream(
 ) -> Dict[str, Dict[str, List[float]]]:
     """Linear probing only (Table 3 in the GSTBench paper)."""
     res_dict: Dict = defaultdict(dict)
-    for data_name, data in all_data.items():
+    for data_name, data in tqdm(all_data.items()):
+        logging.info(f'Evaluating on dataset: {data_name}')
         val_acc_mean, val_acc_std, test_acc_mean, test_acc_std = (
             get_mean_linear_results(
                 pretrain_model, data, all_tasks[data_name], args, device
