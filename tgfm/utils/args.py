@@ -30,6 +30,10 @@ class MetaArguments:
             'help': 'A csv or list of csv files containing the nodes of the graph.'
         },
     )
+    wandb_sweep_id: Optional[str] = field(
+        default=None,
+        metadata={'help': 'The sweep id for evaluation on wandb sweep weights.'},
+    )
     global_seed: int = field(
         default=42,
         metadata={'help': 'Random seed to use for reproducibiility.'},
@@ -79,16 +83,17 @@ class DataArguments:
     data_name: str = field(
         metadata={'help': 'The name of the dataset, needed for pre-built datasets.'},
     )
-    target_data: str = field(
-        metadata={
-            'help': 'The datasets used in target evaluation concatenated by +. As per graphCLIP.'
-        },
-    )
     task_name: str = field(
         metadata={'help': 'The name of the task to train on'},
     )
     pretrain_data_size: int = field(
         metadata={'help': 'Pretraining data size.'}, default=-1
+    )
+    target_data: str = field(
+        default='',
+        metadata={
+            'help': 'The datasets used in target evaluation concatenated by +. As per graphCLIP.'
+        },
     )
     eval_data_names: List[str] = field(
         default_factory=list,
@@ -317,6 +322,27 @@ class TransferArguments(ModelArguments):
     linear_lr: float = field(default=1e-2)
     linear_l2: float = field(default=1e-4)
     linear_dropout: float = field(default=0.1)
+
+    # LeGTJEPA cross-modal parameters (task: 'legtjepa')
+    text_input_dim: int = field(
+        default=384, metadata={'help': 'Dim of the precomputed node text embeddings.'}
+    )
+    embed_dim: int = field(
+        default=384, metadata={'help': 'Shared space where SIGReg is computed.'}
+    )
+    proj_hidden_dim: int = field(default=2048)
+    proj_dropout: float = field(default=0.1)
+    predictor_depth: int = field(default=4)
+    predictor_hidden_dim: int = field(default=2048)
+    predictor_dropout: float = field(default=0.1)
+    freeze_text_projection: bool = field(
+        default=False, metadata={'help': 'Ablation: fully locked text tower.'}
+    )
+    lambda_graph: float = field(default=0.01)
+    lambda_text: float = field(default=0.01)
+    sigreg_num_slices: int = field(default=256)
+    sigreg_num_quad_points: int = field(default=17)
+    sigreg_t_max: float = field(default=4.0)
 
 
 @dataclass
