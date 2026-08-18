@@ -19,5 +19,5 @@ export DGLBACKEND=pytorch
 ulimit -n "$(ulimit -Hn)"      # LazyGraphDataset workers open many files
 
 uv run python tgfm/experiments/transfer_learning/legtjepa.py \
-    --config-file configs/transfer_learning/legtjepa_sweep.yaml \
+    --config-file configs/transfer_learning/legtjepa.yaml \
     --num_gpus "${SLURM_GPUS_ON_NODE:-1}"
