@@ -1,7 +1,7 @@
 program: tgfm/experiments/legtjepa/main.py
 method: random
 entity: reihaneh-rabbany
-project: legtjepa-pretrain     # otherwise wandb auto-names and ignores yours
+project: volume-legtjepa-pretrain     # otherwise wandb auto-names and ignores yours
 metric:
   name: eval/zeroshot_macro
   goal: maximize
