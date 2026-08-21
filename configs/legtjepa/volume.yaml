@@ -1,0 +1,74 @@
+MetaArguments:
+  log_file_path: "legtjepa_volume.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "graph_clip_datasets"
+  is_scratch_location: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    LeGTJEPA:
+      model_args:
+        model: "LeGTJEPA"
+        source_data: "ogbn-arxiv+arxiv_2023+pubmed+ogbn-products+reddit"
+        batch_size: 900            # per rank; 8 ranks => global 7200 (GraphCLIP's run)
+        max_text_length: 512
+
+        log_every_steps: 100
+
+        # --- graph encoder (GraphCLIP Base: GraphGPS, 12 layers, hidden 1024) ---
+        graph_in_dim: 384
+        graph_hidden_dim: 1024
+        graph_num_layers: 12
+        graph_pe_dim: 8
+        attn_type: 'multihead'
+        attn_dropout: 0.0
+
+        # --- text encoder (locked tower) ---
+        text_model_id: 'sentence-transformers/all-MiniLM-L6-v2'
+        freeze_text_backbone: true
+        freeze_text_projection: false   # true => fully frozen text side (ablation)
+
+        # --- shared space and predictors (LeVLJEPA Sec. 3.2 / App. A) ---
+        embed_dim: 384
+        proj_hidden_dim: 2048
+        proj_dropout: 0.1
+        predictor_depth: 4
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.1
+
+        # --- objective ---
+        # 'volume': L_align = mean_a mean_i det G_i^(a), with
+        #   A_i^(a) = [unit(h_a(z_a)) | sg(unit(z_b))]  (GRAM Thm. 1, ICLR 2025).
+        # At k = 2 this is 1 - cos^2(theta) = sin^2(theta) (GRAM App. A.3).
+        align_objective: 'volume'
+
+        # det G is bounded by 1, where the MSE term it replaces runs O(embed_dim).
+        # LeVLJEPA's 0.01 would leave SIGReg ~2 orders of magnitude heavier
+        # relative to alignment than it is in the MSE arm; start an order down.
+        lambda_graph: 1.0e-3
+        lambda_text: 1.0e-3
+        sigreg_num_slices: 256
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+
+        # --- optimization ---
+        # d/dcos (1 - cos^2) = -2cos, and |cos| = O(embed_dim^-1/2) at init, so
+        # the alignment gradient starts far smaller than the MSE arm's. Raised
+        # from 1e-4 accordingly; sweep decides.
+        lr: 5.0e-4
+        weight_decay: 1.0e-5
+        epochs: 30                 # GraphCLIP pretrains for 30 epochs
+        warmup_steps: 1000
+
+        #Evaluation
+        #TODO: Check the logic on this
+        zeroshot_direction: 'text_pred'   # text_pred | graph_pred | direct
+
+      data_args:
+        data_name: 'source_data'
+        task_name: 'node'
+        target_data: 'cora+citeseer+wikics+instagram+photo+computer+history'
+        test_ratio: 0.2
+        eval_seeds: [0, 1, 2, 3, 4]
