@@ -18,7 +18,7 @@ import os
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal, Tuple
+from typing import Literal, Tuple, Union
 
 import torch
 import torch.distributed as dist
@@ -33,6 +33,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase
 from tgfm.evaluation.zero_shot_eval import zeroshot_macro
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
+from tgfm.models.losses.volumeloss import LeGTJEPAVolumeLoss
 from tgfm.utils.args import (
     DataArguments,
     LeGTJEPAArguments,
@@ -197,16 +198,30 @@ def train_epoch(
                 f"lr={scheduler.get_last_lr()[0]:.2e}"
             )
             if verbose:
-                wandb.log(
-                    {
-                        'train/epoch': epoch,
-                        'train/loss': losses['loss'].item(),
-                        'train/cross': losses['cross'].item(),
-                        'train/sigreg_graph': losses['sigreg_graph'].item(),
-                        'train/sigreg_text': losses['sigreg_text'].item(),
-                        'train/lr': scheduler.get_last_lr()[0],
-                    }
-                )
+                if model_args.align_objective == 'volume':
+                    wandb.log(
+                        {
+                            'train/epoch': epoch,
+                            'train/loss': losses['loss'].item(),
+                            'train/cross': losses['cross'].item(),
+                            'train/sigreg_graph': losses['sigreg_graph'].item(),
+                            'train/sigreg_text': losses['sigreg_text'].item(),
+                            'train/volume': losses['volume'].item(),
+                            'train/cos_align': losses['cos_align'].item(),
+                            'train/lr': scheduler.get_last_lr()[0],
+                        }
+                    )
+                else:
+                    wandb.log(
+                        {
+                            'train/epoch': epoch,
+                            'train/loss': losses['loss'].item(),
+                            'train/cross': losses['cross'].item(),
+                            'train/sigreg_graph': losses['sigreg_graph'].item(),
+                            'train/sigreg_text': losses['sigreg_text'].item(),
+                            'train/lr': scheduler.get_last_lr()[0],
+                        }
+                    )
 
     # Average across ranks so the logged epoch loss reflects the global shard.
     loss_tensor = torch.tensor(total_loss / max(1, num_batches), device=device)
@@ -276,6 +291,12 @@ def run_legtjepa(
         find_unused_parameters=False,
         gradient_as_bucket_view=True,
     )
+    criterion: Union[LeGTJEPALoss, LeGTJEPAVolumeLoss]
+    criterion = (
+        LeGTJEPAVolumeLoss(model_args)
+        if model_args.align_objective == 'volume'
+        else LeGTJEPALoss(model_args)
+    ).to(device)
     criterion = LeGTJEPALoss(model_args).to(device)
     if global_rank == 0:
         n_trainable = sum(p.numel() for p in model.module.trainable_parameters())

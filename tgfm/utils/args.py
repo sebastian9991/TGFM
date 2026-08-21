@@ -357,6 +357,9 @@ class LeGTJEPAArguments(ModelArguments):
 
     log_every_steps: int = 100
 
+    #Cross-Modal Alignment: 'mse' or 'volume'
+    align_objective: str = 'mse'
+
     # --- graph encoder (GraphGPS, matched to GraphCLIP Base) ---
     graph_in_dim: int = 384  # SBERT node features
     graph_hidden_dim: int = 1024
