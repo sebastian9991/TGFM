@@ -414,9 +414,10 @@ def main() -> None:
                 'online'
                 if sweep_id is not None
                 else (
-                    'offline' if getattr(meta_args, 'wand_offline', True) else 'online'
+                    'offline' if getattr(meta_args, 'wandb_offline', True) else 'online'
                 )
             )
+            logging.info(f'Using wandb {mode}.')
             wandb.init(
                 project=getattr(meta_args, 'wandb_project', 'legtjepa-pretrain'),
                 name=getattr(meta_args, 'wandb_run_name', None),
