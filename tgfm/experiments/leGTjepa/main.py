@@ -297,7 +297,6 @@ def run_legtjepa(
         if model_args.align_objective == 'volume'
         else LeGTJEPALoss(model_args)
     ).to(device)
-    criterion = LeGTJEPALoss(model_args).to(device)
     if global_rank == 0:
         n_trainable = sum(p.numel() for p in model.module.trainable_parameters())
         logging.info(f'Model loaded. Trainable parameters: {n_trainable}')
