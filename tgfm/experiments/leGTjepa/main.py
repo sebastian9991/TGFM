@@ -329,6 +329,13 @@ def run_legtjepa(
         disable=(global_rank != 0),
     )
 
+    if global_rank == 0:
+        logging.info(
+            f'eval_every_epochs={data_args.eval_every_epochs} '
+            f'verbose={verbose} '
+            f'wandb_mode={wandb.run.settings.mode if wandb.run else None} '
+            f'targets={data_args.target_data.split("+")}'
+        )
     for epoch in epoch_pbar:
         epoch_loss = train_epoch(
             model=model,
@@ -366,6 +373,7 @@ def run_legtjepa(
             )
         if epoch % data_args.eval_every_epochs == 0 or epoch == model_args.epochs:
             if verbose and global_rank == 0:
+                logging.info('Evaluation...')
                 macro, per_ds = zeroshot_macro(
                     model.module,
                     tokenizer,
