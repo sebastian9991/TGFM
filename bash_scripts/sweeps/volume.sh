@@ -18,4 +18,4 @@ export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 uv run torchrun --standalone \
     --nproc_per_node=${SLURM_GPUS_ON_NODE:-4} \
     tgfm/experiments/leGTjepa/main.py \
-    --config-file configs/legtjepa/sweep/volume.yaml
+    --config-file configs/legtjepa/volume.yaml
