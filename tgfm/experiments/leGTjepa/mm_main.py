@@ -39,10 +39,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch_geometric.loader import DataLoader
 from tqdm.auto import tqdm
 
-from tgfm.dataset.evaluation.mm_graph_load import (
-    load_mm_data,
-    parse_mm_target_data,
-)
+from tgfm.dataset.evaluation.mm_load import load_mm_data, parse_mm_target_data
 from tgfm.evaluation.mm_linear_probe import evaluate_dataset as probe_dataset
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
