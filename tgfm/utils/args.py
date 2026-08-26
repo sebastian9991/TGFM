@@ -357,7 +357,7 @@ class LeGTJEPAArguments(ModelArguments):
 
     log_every_steps: int = 100
 
-    #Cross-Modal Alignment: 'mse' or 'volume'
+    # Cross-Modal Alignment: 'mse' or 'volume'
     align_objective: str = 'mse'
 
     # --- graph encoder (GraphGPS, matched to GraphCLIP Base) ---
@@ -411,6 +411,14 @@ class LeGTJEPAArguments(ModelArguments):
     adversarial: bool = False
     adv_step_size: float = 1.0e-2  # GraphCLIP: step_size=1e-2, m=3
     adv_steps: int = 3
+
+    # For the k=3 modalities (image)
+    use_image: bool = False
+    image_in_dim: int = 1024
+    lambda_image: float = 0.0
+    text_input_mode: str = 'raw'
+    text_in_dim: int = 768
+    mm_feat_name: str = 't5dino'
 
 
 @dataclass
