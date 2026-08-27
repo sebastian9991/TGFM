@@ -27,7 +27,8 @@ from torch import Tensor
 from torch_geometric import seed_everything
 from torch_geometric.loader import DataLoader
 
-from tgfm.dataset.evaluation.mm_load import load_mm_data, parse_mm_target_data
+from tgfm.dataset.evaluation.mm_graph_load import load_mm_data
+from tgfm.dataset.evaluation.mm_graph_sampler import parse_mm_target_data
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.utils.args import LeGTJEPAArguments, parse_args
 from tgfm.utils.logger import setup_logging
@@ -35,7 +36,9 @@ from tgfm.utils.path import get_root_dir
 
 torch.backends.mha.set_fastpath_enabled(False)
 
-# labels-w-missing.pt marks absent labels with a sentinel; MM-Graph uses -1.
+# Despite the filename, neither NC dataset carries a negative sentinel:
+# ele-fashion labels run 0..11 (11 of 12 ids populated), books-nc 0..10.
+# The guard is kept as a cheap safeguard for other splits/bundles.
 MISSING_LABEL = -1
 
 parser = argparse.ArgumentParser(
@@ -122,7 +125,7 @@ def evaluate_dataset(
     z = embed_all_nodes(model, graphs, device, eval_batch_size)
     y = data.y
 
-    valid = y != MISSING_LABEL
+    valid = y > MISSING_LABEL
     train_m = data.train_mask & valid
     test_m = data.test_mask & valid
     num_classes = int(y[valid].max().item()) + 1

@@ -36,10 +36,12 @@ import wandb
 from torch.distributed.elastic.multiprocessing.errors import record
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import ConcatDataset, Subset
 from torch_geometric.loader import DataLoader
 from tqdm.auto import tqdm
 
-from tgfm.dataset.evaluation.mm_load import load_mm_data, parse_mm_target_data
+from tgfm.dataset.evaluation.mm_graph_load import load_mm_data
+from tgfm.dataset.evaluation.mm_graph_sampler import parse_mm_target_data
 from tgfm.evaluation.mm_linear_probe import evaluate_dataset as probe_dataset
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
@@ -103,20 +105,24 @@ def warmup_cosine(
     return LambdaLR(optimizer, fn)
 
 
-def load_source_graphs(meta_args: MetaArguments, model_args: ModelArguments) -> list:
+def load_source_graphs(
+    meta_args: MetaArguments, model_args: ModelArguments
+) -> ConcatDataset:
     """Ego-subgraphs from the MM-Graph pretraining datasets.
 
     One subgraph per node, carrying the center node's text feature (data.x)
     and image feature (image_x) -- one positive triple per node.
     """
     assert isinstance(model_args, LeGTJEPAArguments)
-    graphs: list = []
+    parts = []
     for name in model_args.source_data.split('+'):
         data, _, _ = load_mm_data(name, feat_name=model_args.mm_feat_name)
-        graphs.extend(parse_mm_target_data(name, data))
-        logging.info(
-            f'Loaded source dataset {name} (running total: {len(graphs)} subgraphs)'
-        )
+        ds = parse_mm_target_data(name, data)
+        ds.assert_alignment()  # item u is node u: keeps the modalities aligned
+        parts.append(ds)
+        logging.info(f'Loaded source dataset {name} ({len(ds)} subgraphs)')
+    graphs = ConcatDataset(parts)
+    logging.info(f'Pretraining pool: {len(graphs)} subgraphs')
     return graphs
 
 
@@ -228,7 +234,7 @@ def train_epoch(
 def run_legtjepa(
     model_args: ModelArguments,
     data_args: DataArguments,
-    graphs: list,
+    graphs: ConcatDataset,
     save_dir: Path,
     local_rank: int,
     global_rank: int,
@@ -250,7 +256,7 @@ def run_legtjepa(
     # Shard subgraphs across ranks
     all_idx = torch.arange(len(graphs))
     idx_this_rank = all_idx.tensor_split(world_size)[global_rank]
-    graphs_this_rank = [graphs[i] for i in idx_this_rank.tolist()]
+    graphs_this_rank = Subset(graphs, idx_this_rank.tolist())
 
     loader = DataLoader(
         graphs_this_rank,
