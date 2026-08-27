@@ -11,7 +11,7 @@ Directory layout under _mm_root():
     nc_edges-nodeid.pt                       NC edge list, (E, 2)
     split.pt                                 {train_idx, val_idx, test_idx}
     labels-w-missing.pt                      (N,) int64 node labels
-    lp-edge-split-{hard,random}.pt           LP edge split (LP datasets only)
+    lp-edge-split.pt                         LP edge split (LP datasets only)
 
 VERIFIED on ele-fashion and books-nc (2026-08):
   * *_feat.pt is a single float32 tensor of width 1536, NOT a dict.
@@ -45,7 +45,7 @@ from torch_geometric.utils import to_undirected
 
 from tgfm.utils.path import get_scratch
 
-# Ego-subgraphs are built by tgfm.utils.mm_graph_sampler:
+# Ego-subgraphs are built by tgfm.dataset.evaluation.mm_graph_sampler:
 #     from .mm_graph_sampler import parse_mm_target_data
 # parse_target_data in tgfm/utils/process.py cannot be used -- it reads a
 # precomputed JSON of subgraphs from GraphCLIP's preprocessing that MM-Graph
@@ -139,12 +139,7 @@ def load_mm_data(
     if dataset in NC_DATASETS:
         raw_edges = torch.load(root / 'nc_edges-nodeid.pt', map_location='cpu')
     else:
-        lp_file = (
-            'lp-edge-split-random.pt'
-            if dataset == 'books-lp'
-            else 'lp-edge-split-hard.pt'
-        )
-        lp = torch.load(root / lp_file, map_location='cpu')
+        lp = torch.load(root / 'lp-edge-split.pt', map_location='cpu')
         tr = lp['train']
         raw_edges = torch.stack([tr['source_node'], tr['target_node']], dim=0)
 
