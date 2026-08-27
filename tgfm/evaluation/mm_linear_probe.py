@@ -28,7 +28,7 @@ from torch_geometric import seed_everything
 from torch_geometric.loader import DataLoader
 
 from tgfm.dataset.evaluation.mm_load import load_mm_data
-from tgfm.utils.mm_graph_sampler import parse_mm_target_data
+from tgfm.utils.mm_sampler import parse_mm_target_data
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.utils.args import LeGTJEPAArguments, parse_args
 from tgfm.utils.logger import setup_logging
