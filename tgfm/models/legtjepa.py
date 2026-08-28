@@ -68,6 +68,17 @@ class GraphGPSEncoder(torch.nn.Module):
         # Pooled representation: [mean-pool || center node], as in GraphCLIP.
         self.out_dim = channels * 2
 
+    def node_states(
+        self, x: Tensor, pe: Tensor, edge_index: Tensor, batch: Tensor
+    ) -> Tensor:
+        """Per-node embeddings after the conv stack, before pooling. (N, hidden)."""
+        x = torch.cat(
+            (self.node_emb(x.squeeze(-1)), self.pe_lin(self.pe_norm(pe))), dim=1
+        )
+        for conv in self.convs:
+            x = conv(x, edge_index, batch)
+        return x
+
     def forward(
         self,
         x: Tensor,
@@ -76,11 +87,7 @@ class GraphGPSEncoder(torch.nn.Module):
         batch: Tensor,
         center_idx: Tensor,
     ) -> Tensor:
-        x = torch.cat(
-            (self.node_emb(x.squeeze(-1)), self.pe_lin(self.pe_norm(pe))), dim=1
-        )
-        for conv in self.convs:
-            x = conv(x, edge_index, batch)
+        x = self.node_states(x, pe, edge_index, batch)
         return torch.cat((global_mean_pool(x, batch), x[center_idx]), dim=1)
 
 
@@ -194,6 +201,21 @@ class LeGTJEPA(torch.nn.Module):
             batch.x, batch.pe, batch.edge_index, batch.batch, batch.root_n_index
         )
         return self.graph_projection(h)
+
+    def encode_node(self, batch: Any) -> Tensor:
+        """Projected per-node embedding: conv stack, center-node row, no pool.
+
+        Runs the graph tower's node_states and returns the center node's row
+        mapped into the shared space by graph_projection -- the representation
+        the objective was trained on, at node rather than subgraph granularity.
+        Each node must be encoded via its own ego-subgraph (item u centered on
+        node u), so the center row is the only full-context row; see
+        mm_graph_sampler. Returns (B, d).
+        """
+        h = self.graph_encoder.node_states(
+            batch.x, batch.pe, batch.edge_index, batch.batch
+        )
+        return self.graph_projection(h[batch.root_n_index])
 
     def encode_text(
         self,
