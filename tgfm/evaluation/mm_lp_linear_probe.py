@@ -34,11 +34,11 @@ from torch import Tensor
 from torch.nn.functional import normalize
 from torch_geometric.loader import DataLoader
 
-from tgfm.dataset.evaluation.mm_graph_load import _mm_root, load_mm_data
-from tgfm.dataset.evaluation.mm_graph_sampler import parse_mm_target_data
+from tgfm.dataset.evaluation.mm_load import _mm_root, load_mm_data
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.utils.args import LeGTJEPAArguments, parse_args
 from tgfm.utils.logger import setup_logging
+from tgfm.utils.mm_sampler import parse_mm_target_data
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.seed import seed_everything
 
