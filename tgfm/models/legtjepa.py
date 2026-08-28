@@ -202,20 +202,30 @@ class LeGTJEPA(torch.nn.Module):
         )
         return self.graph_projection(h)
 
+    # def encode_node(self, batch: Any) -> Tensor:
+    #     """Projected per-node embedding: conv stack, center-node row, no pool.
+    #
+    #     Runs the graph tower's node_states and returns the center node's row
+    #     mapped into the shared space by graph_projection -- the representation
+    #     the objective was trained on, at node rather than subgraph granularity.
+    #     Each node must be encoded via its own ego-subgraph (item u centered on
+    #     node u), so the center row is the only full-context row; see
+    #     mm_graph_sampler. Returns (B, d).
+    #     """
+    #     h = self.graph_encoder.node_states(
+    #         batch.x, batch.pe, batch.edge_index, batch.batch
+    #     )
+    #     return self.graph_projection(h[batch.root_n_index])
+    #
     def encode_node(self, batch: Any) -> Tensor:
-        """Projected per-node embedding: conv stack, center-node row, no pool.
+        """Per-node embedding: the pooled ego-subgraph embedding of node u.
 
-        Runs the graph tower's node_states and returns the center node's row
-        mapped into the shared space by graph_projection -- the representation
-        the objective was trained on, at node rather than subgraph granularity.
-        Each node must be encoded via its own ego-subgraph (item u centered on
-        node u), so the center row is the only full-context row; see
-        mm_graph_sampler. Returns (B, d).
+        Each subgraph is centered on one node, so encode_graph's
+        [mean-pool || center] output for that batch element is node u's
+        contextual representation -- and it goes through graph_projection at
+        the 2*hidden width the projection was trained on.
         """
-        h = self.graph_encoder.node_states(
-            batch.x, batch.pe, batch.edge_index, batch.batch
-        )
-        return self.graph_projection(h[batch.root_n_index])
+        return self.encode_graph(batch)
 
     def encode_text(
         self,
