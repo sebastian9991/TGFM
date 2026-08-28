@@ -1,0 +1,55 @@
+MetaArguments:
+  log_file_path: 'legtjepa_volume_mmgraph_lptrain_lpeval.log'
+  node_file: ''
+  edge_file: ''
+  root_dir: 'mm_graph_datasets'
+  is_scratch_location: true
+  verbose: true
+  wandb_offline: false
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    LeGTJEPA_volume_mm:
+      model_args:
+        model: 'LeGTJEPA'
+        source_data: 'sports-copurchase'
+        batch_size: 900
+        log_every_steps: 100
+        graph_in_dim: 768
+        graph_hidden_dim: 1024
+        graph_num_layers: 12
+        graph_pe_dim: 8
+        attn_type: 'multihead'
+        attn_dropout: 0.0
+        freeze_text_projection: false
+        use_image: true
+        image_in_dim: 768
+        mm_feat_name: 't5dino'
+        embed_dim: 384
+        proj_hidden_dim: 2048
+        proj_dropout: 0.1
+        predictor_depth: 4
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.1
+        align_objective: 'volume'
+        lambda_graph: 0.001
+        lambda_text: 0.001
+        lambda_image: 0.001
+        sigreg_num_slices: 256
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+        lr: 0.0005
+        weight_decay: 1.0e-05
+        epochs: 30
+        warmup_steps: 1000
+        text_input_mode: 'feature'
+        text_in_dim: 768
+
+      data_args:
+        data_name: 'source_data'
+        task_name: 'link'
+        target_data: 'sports-copurchase'
+        test_ratio: 0.2
+        eval_seeds: [0]
+        eval_every_epochs: 1
