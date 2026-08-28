@@ -401,10 +401,10 @@ def run_legtjepa(
                         data_args.eval_batch_size,
                     )
                     # select on the dot-product test MRR (Mosaic's metric)
-                    score = res['test/dot']['mrr']
+                    score = res['test/cosine']['mrr']
                     probe_res[data_name] = res
                     logging.info(
-                        'DATA: {} | METHOD: lp-probe | dot MRR {:.4f} '
+                        'DATA: {} | METHOD: lp-probe | cosine MRR {:.4f} '
                         'H@1 {:.4f} H@10 {:.4f} | cos MRR {:.4f}'.format(
                             data_name,
                             res['test/cosine']['mrr'],
@@ -469,13 +469,13 @@ def run_legtjepa(
         if data_args.task_name == 'link':
             for data_name, res in best_res_dict.items():
                 logging.info(
-                    'DATA: {} | METHOD: lp-probe | dot MRR {:.4f} H@1 {:.4f} '
+                    'DATA: {} | METHOD: lp-probe | cosine MRR {:.4f} H@1 {:.4f} '
                     'H@3 {:.4f} H@10 {:.4f} | cos MRR {:.4f}'.format(
                         data_name,
-                        res['test/dot']['mrr'],
-                        res['test/dot']['hits@1'],
-                        res['test/dot']['hits@3'],
-                        res['test/dot']['hits@10'],
+                        res['test/cosine']['mrr'],
+                        res['test/cosine']['hits@1'],
+                        res['test/cosine']['hits@3'],
+                        res['test/cosine']['hits@10'],
                         res['test/cosine']['mrr'],
                     )
                 )
