@@ -407,9 +407,9 @@ def run_legtjepa(
                         'DATA: {} | METHOD: lp-probe | dot MRR {:.4f} '
                         'H@1 {:.4f} H@10 {:.4f} | cos MRR {:.4f}'.format(
                             data_name,
-                            res['test/dot']['mrr'],
-                            res['test/dot']['hits@1'],
-                            res['test/dot']['hits@10'],
+                            res['test/cosine']['mrr'],
+                            res['test/cosine']['hits@1'],
+                            res['test/cosine']['hits@10'],
                             res['test/cosine']['mrr'],
                         )
                     )
@@ -441,7 +441,7 @@ def run_legtjepa(
                 if is_lp:
                     wandb.log(
                         {
-                            f'eval/mrr_{k}': v['test/dot']['mrr']
+                            f'eval/mrr_{k}': v['test/cosine']['mrr']
                             for k, v in probe_res.items()
                         }
                         | {'eval/probe_macro': ave_score, 'train/epoch': epoch}
