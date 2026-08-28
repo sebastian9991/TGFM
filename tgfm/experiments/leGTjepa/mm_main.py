@@ -41,8 +41,8 @@ from torch_geometric.loader import DataLoader
 from tqdm.auto import tqdm
 
 from tgfm.dataset.evaluation.mm_load import load_mm_data
-from tgfm.utils.mm_sampler import parse_mm_target_data
 from tgfm.evaluation.mm_linear_probe import evaluate_dataset as probe_dataset
+from tgfm.evaluation.mm_lp_linear_probe import evaluate_dataset as lp_probe_dataset
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
 from tgfm.models.losses.volumeloss import LeGTJEPAVolumeLoss
@@ -54,6 +54,7 @@ from tgfm.utils.args import (
     parse_args,
 )
 from tgfm.utils.logger import setup_logging
+from tgfm.utils.mm_sampler import parse_mm_target_data
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.seed import seed_everything
 from tgfm.views.augmentations import batch_graph_aug
@@ -381,46 +382,83 @@ def run_legtjepa(
 
         # Linear probe on frozen embeddings (MM-Graph NC targets).
         # probe_dataset restores the model's training mode on exit.
+        # Frozen-embedding linear probe. task_name selects the readout:
+        #   'node' -> NC accuracy (ele-fashion, books-nc)
+        #   'link' -> LP MRR/Hits against the shipped negatives (Table 5)
+        # Both probes restore the model's training mode on exit.
         if global_rank == 0 and epoch % data_args.eval_every_epochs == 0:
             logging.info(f'------------Evaluate-{epoch}------------')
-            probe_test, probe_count = 0.0, 0
+            is_lp = data_args.task_name == 'link'
             probe_res = {}
+            score_sum, n = 0.0, 0
             for data_name in data_args.target_data.split('+'):
-                mean, std = probe_dataset(
-                    model.module,
-                    data_name,
-                    model_args,
-                    data_args.eval_seeds,
-                    data_args.eval_batch_size,
-                    device,
-                    model_args.mm_feat_name,
-                )
-                probe_res[data_name] = (mean, std)
-                logging.info(
-                    'DATA: {} | METHOD: linear-probe | TEST-ACC: {:.5f}+/-{:.5f}'.format(
-                        data_name, mean, std
+                if is_lp:
+                    res = lp_probe_dataset(
+                        model.module,
+                        data_name,
+                        model_args,
+                        device,
+                        data_args.eval_batch_size,
                     )
-                )
-                probe_test += mean
-                probe_count += 1
+                    # select on the dot-product test MRR (Mosaic's metric)
+                    score = res['test/dot']['mrr']
+                    probe_res[data_name] = res
+                    logging.info(
+                        'DATA: {} | METHOD: lp-probe | dot MRR {:.4f} '
+                        'H@1 {:.4f} H@10 {:.4f} | cos MRR {:.4f}'.format(
+                            data_name,
+                            res['test/dot']['mrr'],
+                            res['test/dot']['hits@1'],
+                            res['test/dot']['hits@10'],
+                            res['test/cosine']['mrr'],
+                        )
+                    )
+                else:
+                    mean, std = probe_dataset(
+                        model.module,
+                        data_name,
+                        model_args,
+                        data_args.eval_seeds,
+                        data_args.eval_batch_size,
+                        device,
+                        model_args.mm_feat_name,
+                    )
+                    score = mean
+                    probe_res[data_name] = (mean, std)
+                    logging.info(
+                        'DATA: {} | METHOD: nc-probe | TEST-ACC: {:.5f}+/-{:.5f}'.format(
+                            data_name, mean, std
+                        )
+                    )
+                score_sum += score
+                n += 1
 
-            ave_acc_test = probe_test / max(1, probe_count)
+            ave_score = score_sum / max(1, n)
+            metric_name = 'MRR' if is_lp else 'ACC'
             logging.info('--------------------------------')
-            logging.info(f'AVE-ALL-TEST: {ave_acc_test:.5f}')
+            logging.info(f'AVE-ALL-TEST-{metric_name}: {ave_score:.5f}')
             if verbose:
-                wandb.log(
-                    {f'eval/probe_{k}': m for k, (m, _) in probe_res.items()}
-                    | {'eval/probe_macro': ave_acc_test, 'train/epoch': epoch}
-                )
-            if ave_acc_test > best_test_acc:
-                best_test_acc = ave_acc_test
+                if is_lp:
+                    wandb.log(
+                        {
+                            f'eval/mrr_{k}': v['test/dot']['mrr']
+                            for k, v in probe_res.items()
+                        }
+                        | {'eval/probe_macro': ave_score, 'train/epoch': epoch}
+                    )
+                else:
+                    wandb.log(
+                        {f'eval/probe_{k}': m for k, (m, _) in probe_res.items()}
+                        | {'eval/probe_macro': ave_score, 'train/epoch': epoch}
+                    )
+            if ave_score > best_test_acc:
+                best_test_acc = ave_score
                 best_res_dict = deepcopy(probe_res)
                 best_epoch = epoch
             logging.info(
-                f'BEST-TEST-ACC: {best_test_acc:.5f} | BEST-EPOCH: {best_epoch}'
+                f'BEST-TEST-{metric_name}: {best_test_acc:.5f} | BEST-EPOCH: {best_epoch}'
             )
             logging.info('--------------------------------')
-
         dist.barrier(group=cpu_pg)
 
     epoch_pbar.close()
@@ -428,13 +466,28 @@ def run_legtjepa(
     if global_rank == 0 and best_res_dict:
         logging.info('------------Final-Evaluate-------------')
         logging.info(f'-----Best Result from Epoch {best_epoch}-----')
-        for data_name, (mean, std) in best_res_dict.items():
-            logging.info(
-                'DATA: {} | METHOD: linear-probe | TEST-ACC: {:.5f}+/-{:.5f}'.format(
-                    data_name, mean, std
+        if data_args.task_name == 'link':
+            for data_name, res in best_res_dict.items():
+                logging.info(
+                    'DATA: {} | METHOD: lp-probe | dot MRR {:.4f} H@1 {:.4f} '
+                    'H@3 {:.4f} H@10 {:.4f} | cos MRR {:.4f}'.format(
+                        data_name,
+                        res['test/dot']['mrr'],
+                        res['test/dot']['hits@1'],
+                        res['test/dot']['hits@3'],
+                        res['test/dot']['hits@10'],
+                        res['test/cosine']['mrr'],
+                    )
                 )
-            )
-        logging.info(f'BEST-MACRO-TEST-ACC: {best_test_acc:.5f}')
+            logging.info(f'BEST-MACRO-TEST-MRR: {best_test_acc:.5f}')
+        else:
+            for data_name, (mean, std) in best_res_dict.items():
+                logging.info(
+                    'DATA: {} | METHOD: nc-probe | TEST-ACC: {:.5f}+/-{:.5f}'.format(
+                        data_name, mean, std
+                    )
+                )
+            logging.info(f'BEST-MACRO-TEST-ACC: {best_test_acc:.5f}')
 
 
 @record
