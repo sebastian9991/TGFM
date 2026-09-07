@@ -38,7 +38,7 @@ Setup:
 """
 
 import logging
-from pathlib import Path
+import os
 from typing import Optional, Tuple
 
 import torch
@@ -66,7 +66,14 @@ class GraphCLIPAdapter(nn.Module):
         strict: bool = False,
     ) -> None:
         super().__init__()
-        from models import GraphCLIP  # requires the GraphCLIP repo on PYTHONPATH
+        # from models import GraphCLIP  # requires the GraphCLIP repo on PYTHONPATH
+        import sys
+
+        gc_root = os.environ.get('GRAPHCLIP_ROOT', 'third_party/GraphCLIP')
+        gc_root = os.path.abspath(gc_root)
+        if gc_root not in sys.path:
+            sys.path.insert(0, gc_root)
+        from models import GraphCLIP
 
         self.backbone = GraphCLIP(
             graph_input_dim,
@@ -80,7 +87,9 @@ class GraphCLIPAdapter(nn.Module):
             state = state['model_state_dict']
         incompatible = self.backbone.load_state_dict(state, strict=strict)
 
-        missing_graph = [k for k in incompatible.missing_keys if k.startswith('graph_model')]
+        missing_graph = [
+            k for k in incompatible.missing_keys if k.startswith('graph_model')
+        ]
         if missing_graph:
             raise RuntimeError(
                 f'{len(missing_graph)} graph-tower keys missing from {checkpoint_path} '
@@ -142,4 +151,7 @@ def sanity_check(checkpoint_path: str) -> None:
 
 if __name__ == '__main__':
     import sys
-    sanity_check(sys.argv[1] if len(sys.argv) > 1 else 'checkpoints/pretrained_graphclip.pt')
+
+    sanity_check(
+        sys.argv[1] if len(sys.argv) > 1 else 'checkpoints/pretrained_graphclip.pt'
+    )
