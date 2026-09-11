@@ -14,7 +14,7 @@ ExperimentArguments:
       model_args:
         model: 'GraphCLIP'
         source_data: 'sports-copurchase+cloth-copurchase+books-lp'
-        batch_size: 1800  # per rank; x4 GPUs = 7200, GraphCLIP's pretraining batch
+        batch_size: 900  # per rank; x4 GPUs = 7200, GraphCLIP's pretraining batch
         log_every_steps: 100
         # GraphCLIP Base graph tower (train.py: GraphCLIP(384, 1024, 12), pe_dim 8)
         graph_in_dim: 768
