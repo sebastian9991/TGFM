@@ -17,7 +17,7 @@ from typing import Dict
 import torch
 from torch import Tensor
 
-from tgfm.evaluation.graphclip_adapter import graphclip_on_path
+from tgfm.evaluation.graphclip_mm_adapter import graphclip_on_path
 from tgfm.models.losses.volumeloss import gather_embeddings
 
 
