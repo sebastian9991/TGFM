@@ -1,0 +1,58 @@
+MetaArguments:
+  log_file_path: 'graphclip_gi_mmgraph.log'
+  node_file: ''
+  edge_file: ''
+  root_dir: 'mm_graph_datasets'
+  is_scratch_location: true
+  verbose: true
+  wandb_offline: false
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    GraphCLIP_GI_mm:
+      model_args:
+        model: 'GraphCLIP'
+        source_data: 'sports-copurchase+cloth-copurchase+books-lp'
+        batch_size: 1800  # per rank; x4 GPUs = 7200, GraphCLIP's pretraining batch
+        log_every_steps: 100
+        # GraphCLIP Base graph tower (train.py: GraphCLIP(384, 1024, 12), pe_dim 8)
+        graph_in_dim: 768
+        graph_hidden_dim: 1024
+        graph_num_layers: 12
+        graph_pe_dim: 8
+        attn_type: 'multihead'
+        attn_dropout: 0.0
+        # modality pair; under option (b) the graph tower sees the partner modality
+        use_text: false
+        use_image: true
+        graph_feat: 'image'
+        text_input_mode: 'feature'
+        text_in_dim: 768
+        image_in_dim: 768
+        mm_feat_name: 't5dino'
+        # GraphCLIP train.py recipe
+        graph_aug: true  # graph_aug(g, 0.3, 0.2)
+        aug_feat_drop: 0.3
+        aug_edge_drop: 0.2
+        adversarial: true  # adversarial_aug_train(..., 1e-2, 3)
+        adv_step_size: 0.01
+        adv_steps: 3
+        lr: 1.0e-5
+        weight_decay: 1.0e-5
+        epochs: 30
+        lr_schedule: 'constant'
+        warmup_steps: 0
+
+      data_args:
+        data_name: 'source_data'
+        task_name: 'node'
+        target_data: 'ele-fashion+books-nc'
+        test_ratio: 0.2
+        eval_seeds:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        eval_every_epochs: 1
