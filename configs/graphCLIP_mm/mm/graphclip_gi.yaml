@@ -35,12 +35,12 @@ ExperimentArguments:
         graph_aug: true  # graph_aug(g, 0.3, 0.2)
         aug_feat_drop: 0.3
         aug_edge_drop: 0.2
-        adversarial: true  # adversarial_aug_train(..., 1e-2, 3)
+        adversarial: false  # adversarial_aug_train(..., 1e-2, 3)
         adv_step_size: 0.01
         adv_steps: 3
         lr: 1.0e-5
         weight_decay: 1.0e-5
-        epochs: 30
+        epochs: 10
         lr_schedule: 'constant'
         warmup_steps: 0
 
