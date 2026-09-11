@@ -395,6 +395,8 @@ class LeGTJEPAArguments(ModelArguments):
     weight_decay: float = 1.0e-5
     epochs: int = 30
     warmup_steps: int = 1000
+    # 'warmup_cosine' (LeGTJEPA) | 'constant' (GraphCLIP train.py: no scheduler)
+    lr_schedule: str = 'warmup_cosine'
 
     # TODO: Check this
     # --- evaluation ---
@@ -414,11 +416,52 @@ class LeGTJEPAArguments(ModelArguments):
 
     # For the k=3 modalities (image)
     use_image: bool = False
-    image_in_dim: int = 1024
+    # t5dino ships [T5_768 || DINOv2-base_768]; 1024 was a DINOv2-large width.
+    image_in_dim: int = 768
     lambda_image: float = 0.0
     text_input_mode: str = 'raw'
     text_in_dim: int = 768
     mm_feat_name: str = 't5dino'
+
+    # --- modality ablation (MM-Graph table rows) ---
+    # use_text=False removes the text tower entirely (G-I row); the volume
+    # objective then runs at k=2 over (graph, image).
+    use_text: bool = True
+    # Node features the graph tower message-passes over:
+    #   'text'       T5 per node                  graph_in_dim = text_in_dim
+    #   'image'      DINOv2 per node (G-I)        graph_in_dim = image_in_dim
+    #   'text_image' [T5 || DINOv2] per node      graph_in_dim = sum
+    graph_feat: str = 'text'
+
+    def __post_init__(self) -> None:
+        if self.lr_schedule not in ('warmup_cosine', 'constant'):
+            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+        if self.graph_feat not in ('text', 'image', 'text_image'):
+            raise ValueError(
+                f'graph_feat must be text|image|text_image, got {self.graph_feat!r}'
+            )
+        if not (self.use_text or self.use_image):
+            raise ValueError('Need a partner modality: set use_text or use_image.')
+        if not self.use_text and self.align_objective != 'volume':
+            raise ValueError(
+                'use_text=False is only implemented for align_objective="volume".'
+            )
+        if self.graph_feat == 'image' and self.use_text:
+            # The text target is read from the center row of batch.x; with
+            # image node features there is no text column to read it from.
+            raise ValueError('graph_feat="image" requires use_text=False.')
+        if self.graph_feat != 'text' and self.text_input_mode != 'feature':
+            raise ValueError('graph_feat image|text_image requires feature mode.')
+        expected = {
+            'text': self.text_in_dim,
+            'image': self.image_in_dim,
+            'text_image': self.text_in_dim + self.image_in_dim,
+        }[self.graph_feat]
+        if self.text_input_mode == 'feature' and self.graph_in_dim != expected:
+            raise ValueError(
+                f'graph_in_dim={self.graph_in_dim} but graph_feat='
+                f'{self.graph_feat!r} gives {expected}-d node features.'
+            )
 
     ## For LP downstream evaluation
     # --- feature emission ---
@@ -436,6 +479,38 @@ class LeGTJEPAArguments(ModelArguments):
     lp_epochs: int = 100
     lp_batch_size: int = 65536
     lp_eval_every: int = 5
+
+
+@dataclass
+class GraphCLIPMMArguments(LeGTJEPAArguments):
+    """GraphCLIP pretrained from scratch on MM-Graph (tgfm.evaluation.graphclip_adapter.GraphCLIPMM).
+
+    Shares the LeGTJEPA pipeline fields: graph tower widths (graph_hidden_dim,
+    graph_num_layers, graph_pe_dim, attn_*), feature and modality fields,
+    optimization, augmentation, and probe. Projection, predictor, and SIGReg
+    fields are ignored. GraphCLIP is a two-tower model, so exactly one partner
+    modality is allowed, and under option (b) the graph tower's node features
+    are that modality.
+    """
+
+    model: str = 'GraphCLIP'
+    align_objective: str = 'infonce'
+
+    def __post_init__(self) -> None:
+        if self.lr_schedule not in ('warmup_cosine', 'constant'):
+            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+        if self.use_text == self.use_image:
+            raise ValueError('GraphCLIP is two-tower: set exactly one of use_text / use_image.')
+        if self.text_input_mode != 'feature':
+            raise ValueError('GraphCLIP on MM-Graph uses precomputed features (text_input_mode="feature").')
+        expected_feat = 'text' if self.use_text else 'image'
+        if self.graph_feat != expected_feat:
+            raise ValueError(
+                f'graph_feat must be {expected_feat!r} for this modality pair, got {self.graph_feat!r}'
+            )
+        expected_dim = self.text_in_dim if self.use_text else self.image_in_dim
+        if self.graph_in_dim != expected_dim:
+            raise ValueError(f'graph_in_dim={self.graph_in_dim}, node features are {expected_dim}-d')
 
 
 @dataclass
@@ -484,6 +559,7 @@ MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'SimpleMPNN': SimpleMPNN,
     'Transfer': TransferArguments,
     'LeGTJEPA': LeGTJEPAArguments,
+    'GraphCLIP': GraphCLIPMMArguments,
 }
 
 
