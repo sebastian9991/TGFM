@@ -338,6 +338,9 @@ class TransferArguments(ModelArguments):
     freeze_text_projection: bool = field(
         default=False, metadata={'help': 'Ablation: fully locked text tower.'}
     )
+    freeze_image_projection: bool = field(
+        default=False, metadata={'help': 'Ablation: fully locked image tower.'}
+    )
     lambda_graph: float = field(default=0.01)
     lambda_text: float = field(default=0.01)
     sigreg_num_slices: int = field(default=256)
@@ -372,6 +375,10 @@ class LeGTJEPAArguments(ModelArguments):
     text_model_id: str = 'sentence-transformers/all-MiniLM-L6-v2'
     freeze_text_backbone: bool = True  # GraphCLIP-style locked text tower
     freeze_text_projection: bool = False  # ablation: fully frozen text side
+    # Same ablation on the image side: the target becomes a fixed random map of
+    # the frozen DINOv2 feature, so the shared space is pinned to that feature's
+    # geometry instead of drifting with the graph tower.
+    freeze_image_projection: bool = False
 
     # --- shared embedding space / projections (LeVLJEPA Sec. 3.2) ---
     embed_dim: int = 384
@@ -442,6 +449,14 @@ class LeGTJEPAArguments(ModelArguments):
             )
         if not (self.use_text or self.use_image):
             raise ValueError('Need a partner modality: set use_text or use_image.')
+        frozen_text = not self.use_text or self.freeze_text_projection
+        frozen_image = not self.use_image or self.freeze_image_projection
+        if frozen_text and frozen_image and self.align_objective != 'volume':
+            # Only the volume loss drops inactive anchors; the MSE loss would
+            # build a graph-only term with no partner gradient.
+            raise ValueError(
+                'All partner projections frozen requires align_objective="volume".'
+            )
         if not self.use_text and self.align_objective != 'volume':
             raise ValueError(
                 'use_text=False is only implemented for align_objective="volume".'

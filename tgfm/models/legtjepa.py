@@ -13,6 +13,10 @@ Text side:   two input modes, selected by ``text_input_mode``:
                            tokenize). No backbone is built; the projection maps
                            the stored ``text_in_dim`` vector into the shared
                            space, exactly parallel to the image tower.
+Modality ablation: ``use_text=False`` builds no text projection or predictor
+             (G-I row); ``use_image=False`` builds no image tower (G-T row).
+             Unbuilt towers matter under DDP with find_unused_parameters=False,
+             which crashes on trainable parameters that receive no gradient.
 Image side:  precomputed frozen image features (MM-Graph ships DINOv2 / CLIP /
              ViT / ImageBind vectors per node) projected into the shared space.
              Prefer a self-supervised feature (DINOv2) over a text-aligned one
@@ -138,34 +142,46 @@ class LeGTJEPA(torch.nn.Module):
                 f'text_input_mode must be raw|feature, got {self.text_input_mode!r}'
             )
         self.use_image = getattr(args, 'use_image', False)
+        self.use_text = getattr(args, 'use_text', True)
 
         self.graph_encoder = GraphGPSEncoder(args)
 
-        if self.text_input_mode == 'raw':
+        self.text_encoder = None
+        if not self.use_text:
+            logging.info('Text tower disabled (use_text=False).')
+        elif self.text_input_mode == 'raw':
             self.text_encoder = AutoModel.from_pretrained(args.text_model_id)
             text_in_dim = self.text_encoder.config.hidden_size
         else:
             # No backbone: the stored vector IS the encoder output.
-            self.text_encoder = None
             text_in_dim = args.text_in_dim
             logging.info(
                 'Text tower in feature mode: %d-d precomputed features.',
                 text_in_dim,
             )
 
+        # Registration order is kept identical to the pre-ablation model
+        # (graph_projection, text_projection, graph_predictor, text_predictor):
+        # optimizer state is restored by parameter position, so reordering
+        # would misassign Adam moments when resuming an existing checkpoint.
         d = args.embed_dim
         self.graph_projection = projection_head(
             self.graph_encoder.out_dim, args.proj_hidden_dim, d, args.proj_dropout
         )
-        self.text_projection = projection_head(
-            text_in_dim, args.proj_hidden_dim, d, args.proj_dropout
-        )
+        if self.use_text:
+            self.text_projection = projection_head(
+                text_in_dim, args.proj_hidden_dim, d, args.proj_dropout
+            )
         self.graph_predictor = predictor_mlp(
             d, args.predictor_hidden_dim, args.predictor_depth, args.predictor_dropout
         )
-        self.text_predictor = predictor_mlp(
-            d, args.predictor_hidden_dim, args.predictor_depth, args.predictor_dropout
-        )
+        if self.use_text:
+            self.text_predictor = predictor_mlp(
+                d,
+                args.predictor_hidden_dim,
+                args.predictor_depth,
+                args.predictor_dropout,
+            )
 
         if self.use_image:
             self.image_projection = projection_head(
@@ -178,19 +194,28 @@ class LeGTJEPA(torch.nn.Module):
                 args.predictor_dropout,
             )
 
-        if self.text_input_mode == 'raw' and args.freeze_text_backbone:
+        if self.text_encoder is not None and args.freeze_text_backbone:
             for param in self.text_encoder.parameters():
                 param.requires_grad = False
             self.text_encoder.eval()
             logging.info('Text backbone frozen: %s', args.text_model_id)
-        if args.freeze_text_projection:
+        if self.use_text and args.freeze_text_projection:
             for param in self.text_projection.parameters():
                 param.requires_grad = False
             logging.info('Text projection frozen (fully locked text tower).')
+        if self.use_image and getattr(args, 'freeze_image_projection', False):
+            for param in self.image_projection.parameters():
+                param.requires_grad = False
+            logging.info('Image projection frozen (fully locked image tower).')
+        # requires_grad=False does not make a projection deterministic: its
+        # BatchNorm keeps updating running stats and normalizes by batch
+        # statistics in train mode, and its Dropout still fires. A frozen
+        # target is therefore a fixed function plus per-step noise; lower
+        # proj_dropout if you want the target closer to fixed.
 
     def train(self, mode: bool = True) -> 'LeGTJEPA':
         super().train(mode)
-        if self.text_input_mode == 'raw' and self.args.freeze_text_backbone:
+        if self.text_encoder is not None and self.args.freeze_text_backbone:
             # Keep frozen backbone in eval mode so its LayerNorm/dropout
             # statistics stay deterministic.
             self.text_encoder.eval()
@@ -267,17 +292,17 @@ class LeGTJEPA(torch.nn.Module):
     def forward(
         self,
         batch_g: Any,
-        batch_t: Union[Dict[str, Tensor], Tensor],
+        batch_t: Optional[Union[Dict[str, Tensor], Tensor]] = None,
         image_x: Optional[Tensor] = None,
     ) -> Dict[str, Tensor]:
         z_g = self.encode_graph(batch_g)
-        z_t = self._encode_text_any(batch_t)
-        out = {
-            'z_g': z_g,
-            'z_t': z_t,
-            'pred_g': self.graph_predictor(z_g),
-            'pred_t': self.text_predictor(z_t),
-        }
+        out = {'z_g': z_g, 'pred_g': self.graph_predictor(z_g)}
+        if self.use_text:
+            if batch_t is None:
+                raise ValueError('use_text=True but no text input passed to forward')
+            z_t = self._encode_text_any(batch_t)
+            out['z_t'] = z_t
+            out['pred_t'] = self.text_predictor(z_t)
         if self.use_image:
             if image_x is None:
                 raise ValueError('use_image=True but no image_x passed to forward')

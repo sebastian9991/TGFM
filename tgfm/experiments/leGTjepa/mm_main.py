@@ -303,14 +303,20 @@ def run_legtjepa(
     legtjepa: torch.nn.Module = (
         GraphCLIPMM(model_args) if is_graphclip else LeGTJEPA(model_args)
     )
-    # This should be false in all cases, but left for ablations.
-    if not is_graphclip and model_args.use_text and model_args.freeze_text_projection:
-        # The h_t branch is dropped from the loss in this ablation, so the
-        # text predictor never receives gradient. Freeze it explicitly --
-        # otherwise DDP with find_unused_parameters=False crashes on its
-        # unused-but-trainable parameters.
-        for param in legtjepa.text_predictor.parameters():
-            param.requires_grad = False
+    # A frozen partner projection drops that branch's anchor from the loss, so
+    # its predictor never receives gradient. Freeze it explicitly -- otherwise
+    # DDP with find_unused_parameters=False crashes on its unused-but-trainable
+    # parameters.
+    if not is_graphclip:
+        frozen_branches = []
+        if model_args.use_text and model_args.freeze_text_projection:
+            frozen_branches.append(('text_predictor', legtjepa.text_predictor))
+        if model_args.use_image and model_args.freeze_image_projection:
+            frozen_branches.append(('image_predictor', legtjepa.image_predictor))
+        for branch_name, module in frozen_branches:
+            for param in module.parameters():
+                param.requires_grad = False
+            logging.info('%s frozen (its anchor is dropped from the loss).', branch_name)
     # Projections and predictors use BatchNorm; sync statistics across the
     # per-rank batches so SIGReg sees consistent normalization.
     legtjepa = torch.nn.SyncBatchNorm.convert_sync_batchnorm(legtjepa)
