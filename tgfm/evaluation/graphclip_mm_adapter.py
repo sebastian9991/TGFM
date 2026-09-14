@@ -213,6 +213,37 @@ class GraphCLIPMM(nn.Module):
         )
         return graph_embs
 
+    def graph_representations(self, batch: Any) -> Dict[str, Tensor]:
+        """Both probe-able graph representations from one forward pass.
+
+        'backbone'   the input to GPS's ``mlp`` head, i.e. [mean-pool ||
+                     center] at 2*channels, before anything the objective
+                     shapes.
+        'projection' the head's output, which encode_graph returns and InfoNCE
+                     acts on.
+
+        Captured with a pre-hook on ``mlp`` rather than by re-implementing
+        GPS.forward, so this stays correct if the vendored repo's forward
+        changes. Matches LeGTJEPA.graph_representations so both methods can be
+        probed at the same stage.
+        """
+        captured: Dict[str, Tensor] = {}
+
+        def pre_hook(_module: nn.Module, inputs: Tuple[Tensor, ...]) -> None:
+            captured['backbone'] = inputs[0]
+
+        handle = self.graph_model.mlp.register_forward_pre_hook(pre_hook)
+        try:
+            projection = self.encode_graph(batch)
+        finally:
+            handle.remove()
+        if 'backbone' not in captured:
+            raise RuntimeError(
+                'GPS.forward did not call graph_model.mlp; cannot read the '
+                'backbone representation for this checkpoint.'
+            )
+        return {'backbone': captured['backbone'], 'projection': projection}
+
     def forward(
         self,
         batch_g: Any,

@@ -227,6 +227,26 @@ class LeGTJEPA(torch.nn.Module):
         )
         return self.graph_projection(h)
 
+    def graph_representations(self, batch: Any) -> Dict[str, Tensor]:
+        """Both probe-able graph representations from one forward pass.
+
+        'backbone'   [mean-pool || center] straight out of the conv stack,
+                     2*graph_hidden_dim wide. The objective never touches it
+                     directly.
+        'projection' graph_projection(backbone), embed_dim wide. This is what
+                     the volume term and SIGReg act on, and what encode_graph
+                     returns.
+
+        The projection is trained to keep what the objective needs and is free
+        to drop the rest, so the two probe differently (SimCLR Sec. 4.2). They
+        share the ego-subgraph pass, which is the expensive part, so asking for
+        both costs one extra matmul per batch rather than a second pass.
+        """
+        h = self.graph_encoder(
+            batch.x, batch.pe, batch.edge_index, batch.batch, batch.root_n_index
+        )
+        return {'backbone': h, 'projection': self.graph_projection(h)}
+
     # def encode_node(self, batch: Any) -> Tensor:
     #     """Projected per-node embedding: conv stack, center-node row, no pool.
     #
