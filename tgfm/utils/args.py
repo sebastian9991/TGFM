@@ -379,6 +379,14 @@ class LeGTJEPAArguments(ModelArguments):
     # the frozen DINOv2 feature, so the shared space is pinned to that feature's
     # geometry instead of drifting with the graph tower.
     freeze_image_projection: bool = False
+    # Which layer the linear probe reads, for in-loop epoch selection and for
+    # the numbers mm_main reports:
+    #   'projection'  graph_projection output (embed_dim) -- what the objective
+    #                 acts on; every number reported before this field existed
+    #   'backbone'    [mean-pool || center] before it (2*graph_hidden_dim); the
+    #                 projection is kept for training and dropped at eval
+    # Selection and reporting must read the same layer, so this drives both.
+    probe_representation: str = 'projection'
 
     # --- shared embedding space / projections (LeVLJEPA Sec. 3.2) ---
     embed_dim: int = 384
@@ -443,6 +451,11 @@ class LeGTJEPAArguments(ModelArguments):
     def __post_init__(self) -> None:
         if self.lr_schedule not in ('warmup_cosine', 'constant'):
             raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+        if self.probe_representation not in ('projection', 'backbone'):
+            raise ValueError(
+                'probe_representation must be projection|backbone, got '
+                f'{self.probe_representation!r}'
+            )
         if self.graph_feat not in ('text', 'image', 'text_image'):
             raise ValueError(
                 f'graph_feat must be text|image|text_image, got {self.graph_feat!r}'

@@ -17,16 +17,6 @@ Table rows (model_args.model selects the method):
         G-T     use_text=True   use_image=False  graph_feat='text'
         G-I     use_text=False  use_image=True   graph_feat='image'
 
-Model selection: the pretraining epoch with the highest macro *validation*
-accuracy over the NC targets is kept (weights/<exp>/legtjepa_best.pt) and its
-test accuracy / macro-F1 are the reported numbers.
-
-All three modalities arrive as precomputed frozen features (MM-Graph ships
-them per node), so there is no tokenizer and no text backbone in this script:
-``batch.x`` is the text feature, ``batch.image_x`` the image feature, and the
-graph tower consumes ``batch.x`` over the ego-subgraph. This is the
-``text_input_mode='feature'`` path in LeGTJEPA.
-
 Launch with:
     torchrun --standalone --nproc_per_node=4 \
         tgfm/experiments/legtjepa/mm_main.py \
@@ -54,7 +44,7 @@ from torch_geometric.loader import DataLoader
 from tqdm.auto import tqdm
 
 from tgfm.dataset.evaluation.mm_load import load_mm_data
-from tgfm.evaluation.graphclip_mm_adapter import GraphCLIPMM
+from tgfm.evaluation.graphclip_adapter import GraphCLIPMM
 from tgfm.evaluation.mm_linear_probe import evaluate_dataset as probe_dataset
 from tgfm.evaluation.mm_lp_linear_probe import evaluate_dataset as lp_probe_dataset
 from tgfm.models.legtjepa import LeGTJEPA
@@ -343,6 +333,7 @@ def run_legtjepa(
         logging.info(f'Aligning with: {model_args.align_objective}')
         logging.info(f'Criterion: {type(criterion).__name__}')
         logging.info(f'LR schedule: {model_args.lr_schedule}')
+        logging.info(f'Probe representation: {model_args.probe_representation}')
 
     optimizer = torch.optim.AdamW(
         model.module.trainable_parameters(),
@@ -478,6 +469,7 @@ def run_legtjepa(
                         data_args.eval_batch_size,
                         device,
                         model_args.mm_feat_name,
+                        model_args.probe_representation,
                     )
                     score = res['val/acc'][0]
                     probe_res[data_name] = res

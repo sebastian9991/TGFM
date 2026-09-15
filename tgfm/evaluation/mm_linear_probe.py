@@ -49,7 +49,7 @@ from torch_geometric import seed_everything
 from torch_geometric.loader import DataLoader
 
 from tgfm.dataset.evaluation.mm_load import load_mm_data
-from tgfm.evaluation.graphclip_mm_adapter import GraphCLIPMM
+from tgfm.evaluation.graphclip_adapter import GraphCLIPMM
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.utils.args import LeGTJEPAArguments, parse_args
 from tgfm.utils.logger import setup_logging
@@ -230,7 +230,9 @@ def evaluate_dataset_reprs(
 
     # Encoder is frozen and deterministic: embed once, reuse across seeds and
     # across representations.
-    z_by_repr = embed_all_nodes(model, graphs, device, eval_batch_size, representations)
+    z_by_repr = embed_all_nodes(
+        model, graphs, device, eval_batch_size, representations
+    )
     y_all = data.y
 
     valid = y_all > MISSING_LABEL
@@ -273,15 +275,24 @@ def evaluate_dataset(
     eval_batch_size: int,
     device: torch.device,
     feat_name: str,
+    representation: str = 'projection',
 ) -> Dict[str, Tuple[float, float]]:
-    """Projection-only view, for mm_main's in-loop epoch selection.
+    """Single-representation view, for mm_main's in-loop epoch selection.
 
-    Kept at the original signature and return shape so the training loop's
-    selection metric does not silently change meaning.
+    Return shape is exactly METRIC_KEYS, unchanged from before this function
+    took a representation, so the training loop's selection metric keeps its
+    meaning; only which layer it reads can change.
     """
     res = evaluate_dataset_reprs(
-        model, name, model_args, seeds, eval_batch_size, device, feat_name
-    )['projection']
+        model,
+        name,
+        model_args,
+        seeds,
+        eval_batch_size,
+        device,
+        feat_name,
+        (representation,),
+    )[representation]
     # 'dim' is a report field, not a metric: dropping it keeps this return
     # exactly METRIC_KEYS, which is what mm_main's wandb logging iterates over.
     return {k: v for k, v in res.items() if k in METRIC_KEYS}
@@ -363,13 +374,10 @@ def main() -> None:
                 ),
             )
         if len(representations) == 2:
-            delta = (
-                sum(
-                    r['backbone']['test/acc'][0] - r['projection']['test/acc'][0]
-                    for r in results.values()
-                )
-                / n
-            )
+            delta = sum(
+                r['backbone']['test/acc'][0] - r['projection']['test/acc'][0]
+                for r in results.values()
+            ) / n
             logging.info(
                 'backbone - projection, macro test acc: %+.2f points', 100 * delta
             )
