@@ -44,7 +44,7 @@ from torch_geometric.loader import DataLoader
 from tqdm.auto import tqdm
 
 from tgfm.dataset.evaluation.mm_load import load_mm_data
-from tgfm.evaluation.graphclip_adapter import GraphCLIPMM
+from tgfm.evaluation.graphclip_mm_adapter import GraphCLIPMM
 from tgfm.evaluation.mm_linear_probe import evaluate_dataset as probe_dataset
 from tgfm.evaluation.mm_lp_linear_probe import evaluate_dataset as lp_probe_dataset
 from tgfm.models.legtjepa import LeGTJEPA

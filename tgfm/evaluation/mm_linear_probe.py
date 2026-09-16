@@ -49,7 +49,7 @@ from torch_geometric import seed_everything
 from torch_geometric.loader import DataLoader
 
 from tgfm.dataset.evaluation.mm_load import load_mm_data
-from tgfm.evaluation.graphclip_adapter import GraphCLIPMM
+from tgfm.evaluation.graphclip_mm_adapter import GraphCLIPMM
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.utils.args import LeGTJEPAArguments, parse_args
 from tgfm.utils.logger import setup_logging
