@@ -20,7 +20,14 @@ around node v, v's text, v's image -- one positive triple per center node.
 Under DDP, embeddings are gathered across ranks before SIGReg so the
 regularizer sees the global batch marginal (LeVLJEPA App. A); the per-sample
 volume term needs no gathering.
-Set align_objective='volume' and use_image=True in the config to select this.
+Modality sets (the MM-Graph table rows), all with graph as a modality:
+    use_text  use_image   k   columns          anchors
+    True      True        3   (g, t, i)        g, t, i
+    True      False       2   (g, t)           g, t
+    False     True        2   (g, i)           g, i
+At k = 2, det G = 1 - c^2 with c the cosine between the two unit columns, so the
+two-modality rows are the same objective with no triple term.
+Set align_objective='volume' in the config to select this.
 """
 
 from typing import Dict, List
@@ -83,14 +90,21 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
     def __init__(self, args: LeGTJEPAArguments) -> None:
         super().__init__()
         self.use_image = getattr(args, 'use_image', False)
+        self.use_text = getattr(args, 'use_text', True)
         self.lambda_g = args.lambda_graph
         # A branch with no trainable parameters upstream contributes no
-        # gradient: drop its anchor term and its SIGReg term. Text is frozen
-        # via freeze_text_projection; image has no frozen-projection flag, so
-        # its branch is active whenever use_image is set.
-        self.lambda_t = 0.0 if args.freeze_text_projection else args.lambda_text
-        self.text_branch_active = not args.freeze_text_projection
-        self.lambda_i = getattr(args, 'lambda_image', 0.0) if self.use_image else 0.0
+        # gradient: drop its anchor term and its SIGReg term. Both partner
+        # towers read frozen precomputed features, so a frozen projection
+        # leaves nothing trainable above them. The graph anchor is always
+        # active, so at least one anchor always survives.
+        self.text_branch_active = self.use_text and not args.freeze_text_projection
+        self.image_branch_active = self.use_image and not getattr(
+            args, 'freeze_image_projection', False
+        )
+        self.lambda_t = args.lambda_text if self.text_branch_active else 0.0
+        self.lambda_i = (
+            getattr(args, 'lambda_image', 0.0) if self.image_branch_active else 0.0
+        )
 
         self.sigreg = SIGReg(
             num_slices=args.sigreg_num_slices,
@@ -99,33 +113,32 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
         )
 
     def forward(self, out: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        z_g, z_t = out['z_g'], out['z_t']
+        z_g = out['z_g']
+        zero = torch.zeros((), device=z_g.device)
+
+        # (name, embedding, prediction, anchor active); column order g, t, i.
+        modalities = [('g', z_g, out['pred_g'], True)]
+        if self.use_text:
+            modalities.append(('t', out['z_t'], out['pred_t'], self.text_branch_active))
         if self.use_image:
-            embeddings = [z_g, z_t, out['z_image']]
-            predictions = [out['pred_g'], out['pred_t'], out['pred_image']]
-            anchors = [0]  # graph always active
-            if self.text_branch_active:
-                anchors.append(1)
-            anchors.append(2)  # image active whenever use_image
-        else:
-            embeddings = [z_g, z_t]
-            predictions = [out['pred_g'], out['pred_t']]
-            anchors = [0, 1] if self.text_branch_active else [0]
+            modalities.append(
+                ('i', out['z_image'], out['pred_image'], self.image_branch_active)
+            )
+        if len(modalities) < 2:
+            raise ValueError('Volume alignment needs graph plus at least one modality.')
+
+        embeddings = [m[1] for m in modalities]
+        predictions = [m[2] for m in modalities]
+        anchors = [a for a, m in enumerate(modalities) if m[3]]
 
         dets = [squared_volume(embeddings, predictions, a) for a in anchors]
         # det G is per-sample in [0, 1]: mean over batch, then over anchors.
         cross = torch.stack([d.mean() for d in dets]).mean()
 
         sigreg_g = self.sigreg(gather_embeddings(z_g))
-        sigreg_t = (
-            self.sigreg(gather_embeddings(z_t))
-            if self.lambda_t > 0
-            else torch.zeros((), device=z_g.device)
-        )
+        sigreg_t = self.sigreg(gather_embeddings(out['z_t'])) if self.lambda_t > 0 else zero
         sigreg_i = (
-            self.sigreg(gather_embeddings(out['z_image']))
-            if self.lambda_i > 0
-            else torch.zeros((), device=z_g.device)
+            self.sigreg(gather_embeddings(out['z_image'])) if self.lambda_i > 0 else zero
         )
 
         lambda_tot = self.lambda_g + self.lambda_t + self.lambda_i
@@ -141,8 +154,11 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
             'loss': total,
             'cross': cross.detach(),
             'sigreg_graph': sigreg_g.detach(),
-            'sigreg_text': sigreg_t.detach(),
         }
+        if self.use_text:
+            logs['sigreg_text'] = sigreg_t.detach()
+        if self.use_image:
+            logs['sigreg_image'] = sigreg_i.detach()
         with torch.no_grad():
             logs['volume'] = torch.stack(
                 [d.clamp_min(0.0).sqrt().mean() for d in dets]
@@ -151,12 +167,10 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
             # near 1 with mean c near 0 means a batch split across the two
             # even-function minima; det G collapsing while one pair stays
             # orthogonal means an ignored modality (adj(G)=0 kills its grad).
-            zg = normalize(z_g, dim=-1)
-            zt = normalize(z_t, dim=-1)
-            logs['cos_gt'] = (zg * zt).sum(-1).mean()
-            if self.use_image:
-                logs['sigreg_image'] = sigreg_i.detach()
-                zi = normalize(out['z_image'], dim=-1)
-                logs['cos_gi'] = (zg * zi).sum(-1).mean()
-                logs['cos_ti'] = (zt * zi).sum(-1).mean()
+            units = {name: normalize(z, dim=-1) for name, z, _, _ in modalities}
+            names = list(units)
+            for a in range(len(names)):
+                for b in range(a + 1, len(names)):
+                    na, nb = names[a], names[b]
+                    logs[f'cos_{na}{nb}'] = (units[na] * units[nb]).sum(-1).mean()
         return logs

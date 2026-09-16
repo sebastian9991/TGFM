@@ -1,0 +1,66 @@
+MetaArguments:
+  log_file_path: gramjepa_gt_unfrozen_mmgraph.log
+  node_file: ''
+  edge_file: ''
+  root_dir: mm_graph_datasets
+  is_scratch_location: true
+  verbose: true
+  wandb_offline: false
+  global_seed: 42
+ExperimentArguments:
+  exp_args:
+    GramJEPA_GT_unfrozen_mm:
+      model_args:
+        model: LeGTJEPA
+        source_data: sports-copurchase+cloth-copurchase+books-lp
+        batch_size: 450
+        lr: 0.00020233959966107937
+        weight_decay: 0.0005621963117313309
+        warmup_steps: 50
+        epochs: 10
+        graph_num_layers: 6
+        graph_pe_dim: 16
+        attn_dropout: 0.1
+        proj_hidden_dim: 2048
+        proj_dropout: 0.25197590296823447
+        predictor_depth: 2
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.12322528338740824
+        lambda_graph: 0.0021615299391507655
+        lambda_text: 0.00021409391201156647
+        sigreg_num_slices: 128
+        graph_aug: true
+        aug_feat_drop: 0.09985752496875984
+        aug_edge_drop: 0.34201956213611545
+        log_every_steps: 100
+        graph_in_dim: 768
+        graph_hidden_dim: 1024
+        attn_type: multihead
+        embed_dim: 768
+        align_objective: volume
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+        adversarial: false
+        freeze_text_projection: false
+        use_text: true
+        use_image: false
+        graph_feat: text
+        lambda_image: 0.0
+        text_input_mode: feature
+        text_in_dim: 768
+        image_in_dim: 768
+        mm_feat_name: t5dino
+        freeze_image_projection: false
+        probe_representation: backbone
+      data_args:
+        data_name: source_data
+        task_name: node
+        target_data: ele-fashion+books-nc
+        test_ratio: 0.2
+        eval_seeds:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        eval_every_epochs: 1
