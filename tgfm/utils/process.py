@@ -82,18 +82,59 @@ def parse_target_data(name: str, data: Data) -> Data:
     return collected_graph_data
 
 
+# def split_dataloader(
+#     data: Data, graphs: Data, batch_size: int, seed: int = 0, name: str = 'cora'
+# ) -> Tuple[DataLoader, DataLoader, DataLoader]:
+#     train_idx = data.train_mask.nonzero().squeeze()
+#     val_idx = data.val_mask.nonzero().squeeze()
+#     test_idx = data.test_mask.nonzero().squeeze()
+#     train_dataset = [graphs[idx] for idx in train_idx]
+#     val_dataset = [graphs[idx] for idx in val_idx]
+#     test_dataset = [graphs[idx] for idx in test_idx]
+#
+#     train_loader = DataLoader(
+#         train_dataset, batch_size=batch_size, shuffle=True
+#     )  # use DataListLoader for DP rather than DataLoader
+#     val_loader = DataLoader(val_dataset, batch_size=batch_size)
+#     test_loader = DataLoader(test_dataset, batch_size=batch_size)
+#
+#     return train_loader, val_loader, test_loader
+#
+
 def split_dataloader(
-    data: Data, graphs: Data, batch_size: int, seed: int = 0, name: str = 'cora'
+    data: Data,
+    graphs: Data,
+    batch_size: int,
+    seed: int = 0,
+    name: str = 'cora',
+    test_ratio: float = 0.2,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    train_idx = data.train_mask.nonzero().squeeze()
-    val_idx = data.val_mask.nonzero().squeeze()
-    test_idx = data.test_mask.nonzero().squeeze()
-    train_dataset = [graphs[idx] for idx in train_idx]
-    val_dataset = [graphs[idx] for idx in val_idx]
-    test_dataset = [graphs[idx] for idx in test_idx]
+    """Random per-seed split over the id-ordered ego-subgraphs.
+
+    GraphCLIP Table 2 protocol: a fresh random test_ratio test split per seed,
+    so the reported std is the sampling variance over test subsets. The
+    dataset's train/val/test masks are deliberately NOT used here -- they are
+    fixed, and reading them made every seed evaluate the identical subset,
+    which with a frozen deterministic encoder gives exactly zero variance.
+
+    graphs is id-ordered (graphs[i] is node i's subgraph), so the permutation
+    indexes both the subgraph list and data.y consistently.
+    """
+    generator = torch.Generator().manual_seed(seed)
+    num_nodes = len(graphs)
+    perm = torch.randperm(num_nodes, generator=generator)
+
+    n_test = int(test_ratio * num_nodes)
+    test_idx = perm[:n_test]
+    val_idx = perm[n_test : 2 * n_test]
+    train_idx = perm[2 * n_test :]
+
+    train_dataset = [graphs[idx] for idx in train_idx.tolist()]
+    val_dataset = [graphs[idx] for idx in val_idx.tolist()]
+    test_dataset = [graphs[idx] for idx in test_idx.tolist()]
 
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True
+        train_dataset, batch_size=batch_size, shuffle=True, generator=generator
     )  # use DataListLoader for DP rather than DataLoader
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
