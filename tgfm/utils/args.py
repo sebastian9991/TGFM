@@ -447,6 +447,17 @@ class LeGTJEPAArguments(ModelArguments):
     #   'image'      DINOv2 per node (G-I)        graph_in_dim = image_in_dim
     #   'text_image' [T5 || DINOv2] per node      graph_in_dim = sum
     graph_feat: str = 'text'
+    
+        # --- convergence monitoring (main.py) ---
+    # Evaluate at step 0, at log-spaced steps first, 2*first, 4*first, ...,
+    # every conv_eval_every_steps (0 disables that part), and at the last step.
+    conv_eval: bool = False
+    conv_eval_first_step: int = 16
+    conv_eval_every_steps: int = 0
+    # Source pairs removed before sharding, fixed seed: identical across arms.
+    conv_holdout_pairs: int = 4096
+    # Zero-shot on the targets at every eval point; retrieval and RankMe always run.
+    conv_zeroshot: bool = True
 
     def __post_init__(self) -> None:
         if self.lr_schedule not in ('warmup_cosine', 'constant'):
