@@ -338,6 +338,9 @@ class TransferArguments(ModelArguments):
     freeze_text_projection: bool = field(
         default=False, metadata={'help': 'Ablation: fully locked text tower.'}
     )
+    freeze_image_projection: bool = field(
+        default=False, metadata={'help': 'Ablation: fully locked image tower.'}
+    )
     lambda_graph: float = field(default=0.01)
     lambda_text: float = field(default=0.01)
     sigreg_num_slices: int = field(default=256)
@@ -372,6 +375,18 @@ class LeGTJEPAArguments(ModelArguments):
     text_model_id: str = 'sentence-transformers/all-MiniLM-L6-v2'
     freeze_text_backbone: bool = True  # GraphCLIP-style locked text tower
     freeze_text_projection: bool = False  # ablation: fully frozen text side
+    # Same ablation on the image side: the target becomes a fixed random map of
+    # the frozen DINOv2 feature, so the shared space is pinned to that feature's
+    # geometry instead of drifting with the graph tower.
+    freeze_image_projection: bool = False
+    # Which layer the linear probe reads, for in-loop epoch selection and for
+    # the numbers mm_main reports:
+    #   'projection'  graph_projection output (embed_dim) -- what the objective
+    #                 acts on; every number reported before this field existed
+    #   'backbone'    [mean-pool || center] before it (2*graph_hidden_dim); the
+    #                 projection is kept for training and dropped at eval
+    # Selection and reporting must read the same layer, so this drives both.
+    probe_representation: str = 'projection'
 
     # --- shared embedding space / projections (LeVLJEPA Sec. 3.2) ---
     embed_dim: int = 384
@@ -395,6 +410,8 @@ class LeGTJEPAArguments(ModelArguments):
     weight_decay: float = 1.0e-5
     epochs: int = 30
     warmup_steps: int = 1000
+    # 'warmup_cosine' (LeGTJEPA) | 'constant' (GraphCLIP train.py: no scheduler)
+    lr_schedule: str = 'warmup_cosine'
 
     # TODO: Check this
     # --- evaluation ---
@@ -414,11 +431,76 @@ class LeGTJEPAArguments(ModelArguments):
 
     # For the k=3 modalities (image)
     use_image: bool = False
-    image_in_dim: int = 1024
+    # t5dino ships [T5_768 || DINOv2-base_768]; 1024 was a DINOv2-large width.
+    image_in_dim: int = 768
     lambda_image: float = 0.0
     text_input_mode: str = 'raw'
     text_in_dim: int = 768
     mm_feat_name: str = 't5dino'
+
+    # --- modality ablation (MM-Graph table rows) ---
+    # use_text=False removes the text tower entirely (G-I row); the volume
+    # objective then runs at k=2 over (graph, image).
+    use_text: bool = True
+    # Node features the graph tower message-passes over:
+    #   'text'       T5 per node                  graph_in_dim = text_in_dim
+    #   'image'      DINOv2 per node (G-I)        graph_in_dim = image_in_dim
+    #   'text_image' [T5 || DINOv2] per node      graph_in_dim = sum
+    graph_feat: str = 'text'
+    
+        # --- convergence monitoring (main.py) ---
+    # Evaluate at step 0, at log-spaced steps first, 2*first, 4*first, ...,
+    # every conv_eval_every_steps (0 disables that part), and at the last step.
+    conv_eval: bool = False
+    conv_eval_first_step: int = 16
+    conv_eval_every_steps: int = 0
+    # Source pairs removed before sharding, fixed seed: identical across arms.
+    conv_holdout_pairs: int = 4096
+    # Zero-shot on the targets at every eval point; retrieval and RankMe always run.
+    conv_zeroshot: bool = True
+
+    def __post_init__(self) -> None:
+        if self.lr_schedule not in ('warmup_cosine', 'constant'):
+            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+        if self.probe_representation not in ('projection', 'backbone'):
+            raise ValueError(
+                'probe_representation must be projection|backbone, got '
+                f'{self.probe_representation!r}'
+            )
+        if self.graph_feat not in ('text', 'image', 'text_image'):
+            raise ValueError(
+                f'graph_feat must be text|image|text_image, got {self.graph_feat!r}'
+            )
+        if not (self.use_text or self.use_image):
+            raise ValueError('Need a partner modality: set use_text or use_image.')
+        frozen_text = not self.use_text or self.freeze_text_projection
+        frozen_image = not self.use_image or self.freeze_image_projection
+        if frozen_text and frozen_image and self.align_objective != 'volume':
+            # Only the volume loss drops inactive anchors; the MSE loss would
+            # build a graph-only term with no partner gradient.
+            raise ValueError(
+                'All partner projections frozen requires align_objective="volume".'
+            )
+        if not self.use_text and self.align_objective != 'volume':
+            raise ValueError(
+                'use_text=False is only implemented for align_objective="volume".'
+            )
+        if self.graph_feat == 'image' and self.use_text:
+            # The text target is read from the center row of batch.x; with
+            # image node features there is no text column to read it from.
+            raise ValueError('graph_feat="image" requires use_text=False.')
+        if self.graph_feat != 'text' and self.text_input_mode != 'feature':
+            raise ValueError('graph_feat image|text_image requires feature mode.')
+        expected = {
+            'text': self.text_in_dim,
+            'image': self.image_in_dim,
+            'text_image': self.text_in_dim + self.image_in_dim,
+        }[self.graph_feat]
+        if self.text_input_mode == 'feature' and self.graph_in_dim != expected:
+            raise ValueError(
+                f'graph_in_dim={self.graph_in_dim} but graph_feat='
+                f'{self.graph_feat!r} gives {expected}-d node features.'
+            )
 
     ## For LP downstream evaluation
     # --- feature emission ---
@@ -436,6 +518,38 @@ class LeGTJEPAArguments(ModelArguments):
     lp_epochs: int = 100
     lp_batch_size: int = 65536
     lp_eval_every: int = 5
+
+
+@dataclass
+class GraphCLIPMMArguments(LeGTJEPAArguments):
+    """GraphCLIP pretrained from scratch on MM-Graph (tgfm.evaluation.graphclip_adapter.GraphCLIPMM).
+
+    Shares the LeGTJEPA pipeline fields: graph tower widths (graph_hidden_dim,
+    graph_num_layers, graph_pe_dim, attn_*), feature and modality fields,
+    optimization, augmentation, and probe. Projection, predictor, and SIGReg
+    fields are ignored. GraphCLIP is a two-tower model, so exactly one partner
+    modality is allowed, and under option (b) the graph tower's node features
+    are that modality.
+    """
+
+    model: str = 'GraphCLIP'
+    align_objective: str = 'infonce'
+
+    def __post_init__(self) -> None:
+        if self.lr_schedule not in ('warmup_cosine', 'constant'):
+            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+        if self.use_text == self.use_image:
+            raise ValueError('GraphCLIP is two-tower: set exactly one of use_text / use_image.')
+        if self.text_input_mode != 'feature':
+            raise ValueError('GraphCLIP on MM-Graph uses precomputed features (text_input_mode="feature").')
+        expected_feat = 'text' if self.use_text else 'image'
+        if self.graph_feat != expected_feat:
+            raise ValueError(
+                f'graph_feat must be {expected_feat!r} for this modality pair, got {self.graph_feat!r}'
+            )
+        expected_dim = self.text_in_dim if self.use_text else self.image_in_dim
+        if self.graph_in_dim != expected_dim:
+            raise ValueError(f'graph_in_dim={self.graph_in_dim}, node features are {expected_dim}-d')
 
 
 @dataclass
@@ -484,6 +598,7 @@ MODEL_REGISTRY: Dict[str, Type[ModelArguments]] = {
     'SimpleMPNN': SimpleMPNN,
     'Transfer': TransferArguments,
     'LeGTJEPA': LeGTJEPAArguments,
+    'GraphCLIP': GraphCLIPMMArguments,
 }
 
 

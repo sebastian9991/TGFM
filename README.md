@@ -50,151 +50,201 @@ All experiment scripts will include an argument which points to a configuration 
 
 ```sh
 MetaArguments:
-  log_file_path: "unigraph_ogb_pretraining.log"
-  root_dir: "ogb_100m/"
+  log_file_path: "legtjepa_volume.log"
+  root_dir: "graph_clip_datasets"
   is_scratch_location: true
+  verbose: true
   global_seed: 42
 
 ExperimentArguments:
   exp_args:
-    Unigraph:
+    LeGTJEPA:
       model_args:
-        model: "Unigraph"
-        num_layers: 3
-        num_neighbors: [4, 2, 1]
-        batch_size: 16
-        dropout: 0.2
-        lr: 2.0e-5
-        weight_decay: 0.001
+        model: "LeGTJEPA"
+        align_objective: "volume"
+        embed_dim: 384
+        lr: 1.0e-4
+        weight_decay: 1.0e-5
         device: 0
       data_args:
-        task_name: "pre-training"
+        task_name: "node"
+        target_data: "cora+citeseer+wikics"
+        eval_seeds: [0, 1, 2, 3, 4]
 ```
 
 For more information on the arguments check: [args.py](tgfm/utils/args.py)
 
-### Pre-Training
+## Experiments
 
-Due to the scale of the graph datasets and text attributes that come with them we recommend pre-training this in a distributed setup, with multiple nodes and GPUs. Here is an example launch script:
+Every experiment is a two-stage pipeline: self-supervised pretraining, then a readout on the
+frozen encoder. The encoder is never trained on target labels in any of them.
 
-#### Unigraph
+`align_objective` selects the alignment term: `mse` for the cross-modal squared-distance
+objective (LeVLJEPA Eq. 5), `volume` for the Gramian volume $\\det G$ (GRAM, Cicchetti et
+al., ICLR 2025). Both keep the per-modality SIGReg term and use no negatives.
 
-![unigraph_model](img/Unigraph.png)
+The experiments live on two branches. Check out the matching branch before running:
 
-```sh
-#!/bin/bash
-#SBATCH --nodes=x
-#SBATCH --ntasks-per-node=1
-#SBATCH --mem=400G
-#SBATCH --job-name=unigraph-pretrain
+| Experiment                           | Branch                   | Config                                |
+| ------------------------------------ | ------------------------ | ------------------------------------- |
+| Node classification (GraphCLIP TAGs) | `br_volume_alignment`    | `configs/legtjepa/base.yaml`          |
+| Link prediction (GraphCLIP TAGs)     | `br_volume_alignment`    | `configs/legtjepa/base.yaml`          |
+| Linear probing (MM-Graph)            | `br_multimodal_ablation` | `configs/gramJEPA/mm/gramjepa_*.yaml` |
 
-set -e
-echo "Date:     $(date)"
-echo "Job ID:   $SLURM_JOB_ID"
-echo "Nodes:    $SLURM_JOB_NODELIST"
+Each script's module docstring carries its own launch notes; the commands below are the
+canonical invocations.
 
+### 1. Node classification
 
-echo "Attempt: #${SLURM_RESTART_COUNT:-0}"
-
-export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4))
-
-echo "Master: $MASTER_ADDR:$MASTER_PORT"
-echo "Slurm Nodes: $(($SLURM_NNODES))"
-
-# Note the bash -c wrapper so SLURM_NODEID is evaluated in each task.
-srun --gres-flags=allow-task-sharing bash -c "
-    uv run torchrun \
-        --nnodes=\$SLURM_NNODES \
-        --node_rank=\$SLURM_NODEID \
-        --nproc_per_node=\$SLURM_GPUS_ON_NODE \
-        --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
-        --master_addr=$MASTER_ADDR \
-        --master_port=$MASTER_PORT \
-        tgfm/experiments/unigraph/pretraining.py \
-        --config-file configs/unigraph/base.yaml
-    "
-```
-
-### Memory Recommendations
-
-You will need to accommodate the subgraph size depending on the defined max sequence length in your text store in order for the batches to fit in GPU memory.
-
-Subgraph sizes are calculated based on the `batch_size` and `num_neighbor` model argument paramaters. Your actual subgraph batch size will be at most:
-
-$$|n_id|_{\\max} = B \\cdot \\left(1 + \\sum_{\\ell=1}^{L} \\prod\_{i=1}^{\\ell} k_i\\right)$$
-
-Where $$B$$ is your batch size, and $$k_i$$ is the ith neighbor in `num_neighbor`.
-
-If you are willing to trade-off efficiency for lighter memory loads on the GPU, then consider enabling gradient checkpointing:
+Zero-shot node classification on the GraphCLIP target TAGs, following the GraphCLIP Table 2
+protocol: a random 20% test split per seed, mean accuracy ± std over `data_args.eval_seeds`.
+Prediction is the nearest label sentence by cosine similarity — no classifier is fit, and the
+target labels are never seen by the encoder.
 
 ```sh
-ExperimentArguments:
-  exp_args:
-    Unigraph:
-      model_args:
-        model: ""
-        gradient_checkpointing: true #Enable gradient checkpointing
-      data_args:
-        task_name: "pre-training"
+git checkout br_volume_alignment
 ```
 
-### Evaluation
-
-We use a variety of popular text-attributed graph datasets for OOD experimentation. To prepare these datasets for evaluation we have included scripts to do so under the [evaluation data folder](data/evaluation_data).
-
-For example with Cora:
+**Pretrain.** Distributed across the GPUs on one node:
 
 ```sh
-uv run data/evaluation_data/cora/prepare_cora.py --output-dir path/to/output
+uv run torchrun \
+    --standalone \
+    --nproc_per_node=$SLURM_GPUS_ON_NODE \
+    tgfm/experiments/leGTJEPA/main.py \
+    --config-file configs/legtjepa/base.yaml
 ```
 
-After preparing each evaluation dataset
+The run checkpoints to `<root_dir>/weights/<experiment>/legtjepa.pt` after every epoch and
+resumes from it automatically if present. Set `align_objective: 'volume'` in the config for
+the volumetric arm and `'mse'` for the baseline; the two arms differ in nothing else.
+
+**Evaluate.** Same config file, so the evaluation rebuilds the architecture the checkpoint
+was trained with:
 
 ```sh
-uv run tgfm/evaluation/evaluate_tags.py --config-file path/to/pretrain/config --text-store-dir path/to/evaluation/dataset
+uv run tgfm/evaluation/zero_shot_eval.py \
+    --config-file configs/legtjepa/base.yaml
 ```
 
-### Pre-Processing
+Scoring direction comes from `model_args.zeroshot_direction`:
 
-Considering the size of these graph datasets and the added text-attributes, we utilize a memmory mapped text store, which allows us to load the text in memory only when needed. We've made available scripts process the OGB MAG240M into the format required.
+| Value        | Score                                                    |
+| ------------ | -------------------------------------------------------- |
+| `text_pred`  | $\\cos(z_g,\\ h_t(z_t))$ — LeVLJEPA's reported direction |
+| `graph_pred` | $\\cos(h_g(z_g),\\ z_t)$                                 |
+| `direct`     | $\\cos(z_g,\\ z_t)$                                      |
 
-#### OGB MAG240M
+Targets come from `data_args.target_data`, a `+`-joined list of dataset names; each needs a
+prompt template in `EVAL_TEMPLATE`.
 
-NOTE: You will need to download the text from [OGB](https://ogb.stanford.edu/docs/lsc/mag240m/)
+### 2. Link prediction
+
+Zero-shot link prediction on the same pretrained encoder, no retraining. A candidate link
+$(u, v)$ is scored by the cosine similarity of the two endpoint ego-subgraph embeddings.
+Both operands come from the same encoder, so this score needs no predictor to be well
+defined — `direct` is the principled direction here.
 
 ```sh
-#Get the graph data
-uv run scripts/process_mag_dataset.py --root path/to/save/mag/graph/data
-
-#Build the text-store
-uv run scripts/process_mag_tokens.py --text-csv-path path/to/text/ --output-memmap-path path/to/resulting/memmap
+git checkout br_volume_alignment
 ```
-
-#### CrediBench
-
-NOTE: You will need to download the text from [CrediBench-RawText](https://huggingface.co/datasets/credi-net/CrediText/tree/main). Additionally, the vertices and edges from csv files found [here](https://huggingface.co/datasets/credi-net/CrediBench/tree/main)
-
-We process the the parquet files using [nemo-curator](https://github.com/NVIDIA-NeMo/Curator) more information on the data processing can be found [here](https://huggingface.co/datasets/credi-net/CleanCDB).
 
 ```sh
-#Text Cleaning
-uv run tgfm/processing/text_cleaning/main.py --file-paths $SCRATCH/data/month/text_data/ --output-path $SCRATCH/data/month/text_data/cleaned_text/ --files-per-partition 1 --num-gpus 1
+# AUC: positives against an equal number of uniformly sampled non-edges
+# (GraphCLIP Sec. 4.3.2: 50% of edges held out, mean +/- std over 5 seeds)
+uv run tgfm/evaluation/zero_shot_link_pred.py \
+    --config-file configs/legtjepa/base.yaml
 
-#Text Deduplication
-uv run --active tgfm/processing/deduplication/main.py --file-paths $SCRATCH/data/month/text_data/cleaned_text/ --output-path $SCRATCH/data/month/text_data/deduplication/ --num-gpus 1
-
-
-#Text Language Labelling
-uv run --active tgfm/processing/language_extraction/main.py --file-paths $SCRATCH/data/month/text_data/deduplication/ --output-path $SCRATCH/data/month/text_data/language_extracted/ --fast-text-path fast_text/ --num-gpus 1
+# MRR / Hits: positives ranked against the held-out negatives
+uv run tgfm/evaluation/zero_shot_link_pred.py \
+    --config-file configs/legtjepa/base.yaml \
+    --mrr
 ```
 
-After which you can construct the text-store object and PyG Dataset:
+### 3. Linear probing on MM-Graph
+
+Three-modality pretraining (graph, text, image) on the MM-Graph / Mosaic of Modalities
+benchmark, evaluated by a linear probe on frozen embeddings. Pretraining uses the
+link-prediction graphs; the probe evaluates transfer to the held-out node-classification
+graphs, whose labels the encoder never sees.
 
 ```sh
-uv run tgfm/processing/process_cdb/prepare_cdb_vertices.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed
-
-uv run tgfm/processing/process_cdb/prepare_cdb_edges.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed --registry $SCRATCH/path/to/processed/domain_registry.parquet
-
-uv run tgfm/processing/process_cdb/prepare_cdb_text_store.py --input-root $SCRATCH/path/to/raw --output-root $SCRATCH/path/to/processed --registry $SCRATCH/path/to/processed/domain_registry.parquet --tokenizer xlm-roberta-base --seq-len 512
+git checkout br_multimodal_ablation
 ```
+
+**Data.** MM-Graph ships precomputed per-node features, so there is no tokenization or image
+encoding step. Directory names on disk differ from the paper's display names:
+
+| Paper         | Directory           | Task                |
+| ------------- | ------------------- | ------------------- |
+| Amazon-Sports | `sports-copurchase` | link prediction     |
+| Amazon-Cloth  | `cloth-copurchase`  | link prediction     |
+| Goodreads-LP  | `books-lp`          | link prediction     |
+| Ele-Fashion   | `ele-fashion`       | node classification |
+| Goodreads-NC  | `books-nc`          | node classification |
+
+```sh
+DEST=$SCRATCH/mm_graph_datasets
+
+hf download mm-graph-org/mm-graph --repo-type dataset --local-dir "$DEST" \
+  --include "sports-copurchase/*" "cloth-copurchase/*" "books-lp/*" \
+            "ele-fashion/*" "books-nc/*" \
+  --exclude "*/clip_feat.pt" "*/imagebind_feat.pt" "*/t5vit_feat.pt"
+```
+
+The `--exclude` drops the feature bundles the configs do not use. `t5dino_feat.pt` is the
+default (`mm_feat_name: 't5dino'`): a single `N x 1536` float32 tensor, T5 text (768)
+concatenated with DINOv2 image (768), **text first**. DINOv2 rather than CLIP or ImageBind is
+deliberate — a text-aligned image encoder pre-collapses the text-image volume before the
+objective acts on it, so the alignment would be inherited rather than earned.
+
+**Pretrain.** One config per modality combination, under `configs/gramJEPA/mm/`:
+
+```sh
+ls configs/gramJEPA/mm/gramjepa_*.yaml
+```
+
+```sh
+uv run torchrun \
+    --standalone \
+    --nproc_per_node=$SLURM_GPUS_ON_NODE \
+    tgfm/experiments/leGTjepa/mm_main.py \
+    --config-file configs/gramJEPA/mm/gramjepa_<combination>.yaml
+```
+
+The combination is set by `model_args.graph_feat` (which node features the graph tower
+consumes) together with `use_image`; run each config to fill one row of the ablation:
+
+| Combination          | Towers             |
+| -------------------- | ------------------ |
+| graph + text         | graph, text        |
+| graph + image        | graph, image       |
+| graph + text + image | graph, text, image |
+
+`mm_main.py` runs the probe in-loop every `data_args.eval_every_epochs` epochs and keeps the
+epoch with the highest macro **validation** accuracy, writing it to
+`<root_dir>/weights/<experiment>/legtjepa_best.pt` alongside the last-epoch `legtjepa.pt`.
+Test labels influence neither choice.
+
+**Probe.** Standalone evaluation of a saved checkpoint:
+
+```sh
+uv run tgfm/evaluation/mm_linear_probe.py \
+    --config-file configs/gramJEPA/mm/gramjepa_<combination>.yaml \
+    --representation both \
+    --ckpt-name legtjepa_best.pt
+```
+
+The probe is a single `torch.nn.Linear(d, num_classes)` on standardized frozen features — no
+nonlinearity, no fine-tuning — trained on the dataset's own `train_mask`, selected on
+`val_mask`, scored on `test_mask`. It reports accuracy and macro-F1, and emits a `TABLE-ROW`
+line per representation for pasting into the results table.
+
+`--representation` picks which layer is probed:
+
+- `projection` — the `graph_projection` output, what the objective acts on and what
+  `encode_graph` returns. The default.
+- `backbone` — `[mean-pool || center]` before that head, `2 * graph_hidden_dim` wide.
+- `both` — both, from a single ego-subgraph pass.
+
+`--ckpt-name` selects `legtjepa_best.pt` (validation-selected) or `legtjepa.pt` (last epoch).

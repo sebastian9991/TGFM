@@ -95,7 +95,7 @@ def embed_all_nodes(
     embeddings = []
     for batch in loader:
         batch = batch.to(device)
-        z_g = model.encode_graph(batch)
+        z_g = model.graph_representations(batch)['backbone']
         if direction == 'graph_pred':
             z_g = model.graph_predictor(z_g)
         embeddings.append(z_g.cpu())
@@ -240,7 +240,7 @@ def main() -> None:
             f'cuda:{model_args.device}' if torch.cuda.is_available() else 'cpu'
         )
         model = LeGTJEPA(model_args).to(device)
-        ckpt_path = (
+        ckpt_path = ( 
             Path(str(meta_args.root_dir)) / 'weights' / experiment / 'legtjepa.pt'
         )
         ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)

@@ -1,0 +1,69 @@
+MetaArguments:
+  log_file_path: 'gramjepa_gti_tuned_mmgraph.log'
+  node_file: ''
+  edge_file: ''
+  root_dir: 'mm_graph_datasets'
+  is_scratch_location: true
+  verbose: true
+  wandb_offline: false
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    GramJEPA_GTI_tuned_mm:
+      model_args:
+        model: 'LeGTJEPA'
+        source_data: 'sports-copurchase+cloth-copurchase+books-lp'
+        # --- swept on the graph+text NC setup; see notes in the reply ---
+        batch_size: 450          # PER RANK. x4 = 1800 global (SIGReg batch)
+        lr: 0.00020233959966107937
+        weight_decay: 0.0005621963117313309
+        warmup_steps: 50
+        epochs: 10
+        graph_num_layers: 6
+        graph_pe_dim: 16
+        attn_dropout: 0.1
+        proj_hidden_dim: 2048
+        proj_dropout: 0.25197590296823447
+        predictor_depth: 2
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.12322528338740824
+        lambda_graph: 0.0021615299391507655
+        lambda_text: 0.0        # text projection frozen: loss drops this term
+        sigreg_num_slices: 128
+        graph_aug: true
+        aug_feat_drop: 0.09985752496875984
+        aug_edge_drop: 0.34201956213611545
+        # --- not in the sweep: unchanged from the untuned config ---
+        log_every_steps: 100
+        graph_in_dim: 1536
+        graph_hidden_dim: 1024
+        attn_type: 'multihead'
+        embed_dim: 768  # matches text_in_dim: frozen projection is ~square
+        align_objective: 'volume'
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+        adversarial: false
+        freeze_text_projection: true   # target = fixed random map of T5
+        freeze_image_projection: true  # target = fixed random map of DINOv2
+        use_text: true
+        use_image: true
+        graph_feat: 'text_image'  # [T5 || DINOv2] node features (option b)
+        lambda_image: 0.0        # image projection frozen: loss drops this term
+        text_input_mode: 'feature'
+        text_in_dim: 768
+        image_in_dim: 768
+        mm_feat_name: 't5dino'
+
+      data_args:
+        data_name: 'source_data'
+        task_name: 'node'
+        target_data: 'ele-fashion+books-nc'
+        test_ratio: 0.2
+        eval_seeds:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        eval_every_epochs: 2
