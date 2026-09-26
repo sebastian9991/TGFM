@@ -161,18 +161,6 @@ uv run tgfm/evaluation/zero_shot_link_pred.py \
     --mrr
 ```
 
-**Leakage caveat.** Node $u$'s ego-subgraph contains the edge $(u, v)$ whenever $v$ is a
-neighbour, so a test edge is visible in the encoder input that produces its own score. This
-is inherent to the GraphCLIP protocol and applies equally to their reported numbers, so the
-comparison is controlled. `--mask-test-edges` re-parses the target graphs with test edges
-deleted, for an honest-but-not-comparable variant to report alongside rather than instead:
-
-```sh
-uv run tgfm/evaluation/zero_shot_link_pred.py \
-    --config-file configs/legtjepa/base.yaml \
-    --mask-test-edges
-```
-
 ### 3. Linear probing on MM-Graph
 
 Three-modality pretraining (graph, text, image) on the MM-Graph / Mosaic of Modalities
@@ -260,50 +248,3 @@ line per representation for pasting into the results table.
 - `both` — both, from a single ego-subgraph pass.
 
 `--ckpt-name` selects `legtjepa_best.pt` (validation-selected) or `legtjepa.pt` (last epoch).
-
-## SLURM
-
-Both pretraining entry points are `torchrun` scripts. An example multi-GPU launch:
-
-```sh
-#!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:a100:4
-#SBATCH --mem=400G
-#SBATCH --job-name=gramjepa-pretrain
-
-set -e
-echo "Date:     $(date)"
-echo "Job ID:   $SLURM_JOB_ID"
-echo "Nodes:    $SLURM_JOB_NODELIST"
-echo "Attempt:  #${SLURM_RESTART_COUNT:-0}"
-
-export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-export MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4))
-
-echo "Master: $MASTER_ADDR:$MASTER_PORT"
-
-# Note the bash -c wrapper so SLURM_NODEID is evaluated in each task.
-srun --gres-flags=allow-task-sharing bash -c "
-    uv run torchrun \
-        --nnodes=\$SLURM_NNODES \
-        --node_rank=\$SLURM_NODEID \
-        --nproc_per_node=\$SLURM_GPUS_ON_NODE \
-        --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
-        tgfm/experiments/leGTjepa/mm_main.py \
-        --config-file configs/gramJEPA/mm/gramjepa_gti.yaml
-    "
-```
-
-### Sweeps
-
-Hyperparameter sweeps are launched with a `wandb` agent inside `sbatch`. Each sweep config
-pins `align_objective`, so one sweep covers one arm and the two are filterable on that axis:
-
-```sh
-wandb sweep bash_scripts/sweeps/random_large_sweep.yaml   # random search
-wandb sweep bash_scripts/sweeps/bayes_volume_sweep.yaml   # bayes refinement
-
-sbatch bash_scripts/sweeps/volume.sh <sweep-id>
-```
