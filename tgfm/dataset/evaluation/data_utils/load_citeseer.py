@@ -14,7 +14,7 @@ def get_raw_text_citeseer(use_text: bool = False, seed: int = 0) -> Tuple[Data, 
     scratch = get_scratch()
     path = scratch / 'graph_clip_datasets' / 'processed' / 'citeseer.pt'
     if osp.exists(str(path)):
-        data = torch.load(path, map_location='cpu')
+        data = torch.load(path, map_location='cpu', weights_only=False)
         data.edge_index = to_undirected(data.edge_index)
 
         torch.manual_seed(seed)

@@ -40,9 +40,10 @@ from tgfm.evaluation.transfer_eval import (
     get_node_data_all,
 )
 from tgfm.models.base_models.base_models import GATNet, GCNNet
+from tgfm.models.pretrain_model.bgrl import PretrainBGRL
+from tgfm.models.pretrain_model.legtjepa_pretrain import PretrainLeGTJEPA
 from tgfm.models.pretrain_model.SIGReg import PretrainSIGReg
 from tgfm.models.pretrain_model.sigreg_residual import PretrainSIGRegResidual
-from tgfm.models.pretrain_model.bgrl import PretrainBGRL
 from tgfm.utils.args import (
     DataArguments,
     MetaArguments,
@@ -52,14 +53,13 @@ from tgfm.utils.args import (
 from tgfm.utils.collate import Universal_Collator
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.lr import ConstantLRScheduler, WarmupCosineDecayScheduler
-from tgfm.utils.path import get_root_dir
+from tgfm.utils.path import get_root_dir, get_scratch
 from tgfm.utils.seed import seed_everything
 from tgfm.utils.transfer_utils import (
     estimate_remaining_time,
     init_process_group,
     worker_init_fn,
 )
-from tgfm.utils.path import get_scratch
 
 GraphEncoder = Union[GCNNet, GATNet]
 
@@ -272,13 +272,17 @@ def get_model(device: torch.device, model_args: TransferArguments) -> torch.nn.M
     else:
         raise ValueError(f'Not implemented: {model_args.encoder}.')
 
-    pretrain_model: Optional[Union[PretrainBGRL, PretrainSIGReg, PretrainSIGRegResidual]] = None
+    pretrain_model: Optional[
+        Union[PretrainBGRL, PretrainSIGReg, PretrainSIGRegResidual]
+    ] = None
     if model_args.task.lower() == 'sigreg':
         pretrain_model = PretrainSIGReg(encoder, device, model_args)
     elif model_args.task.lower() == 'bgrl':
         pretrain_model = PretrainBGRL(encoder, device, model_args)
     elif model_args.task.lower() == 'sigreg_res':
         pretrain_model = PretrainSIGRegResidual(encoder, device, model_args)
+    elif model_args.task.lower() == 'legtjepa':
+        pretrain_model = PretrainLeGTJEPA(encoder, device, model_args)
     else:
         raise ValueError(f'Not implemented: {model_args.task}.')
 
@@ -377,7 +381,7 @@ def pretrain(
     model = get_model(device, model_args).to(device)
 
     if model_args.task.lower() == 'bgrl':
-        model.set_total_steps(len(dataloader)*model_args.epochs)
+        model.set_total_steps(len(dataloader) * model_args.epochs)
 
     if device.type == 'cpu':
         model = DistributedDataParallel(model, find_unused_parameters=False)

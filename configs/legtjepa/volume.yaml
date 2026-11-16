@@ -4,6 +4,7 @@ MetaArguments:
   edge_file: ""
   root_dir: "graph_clip_datasets"
   is_scratch_location: true
+  verbose: true
   global_seed: 42
 
 ExperimentArguments:
@@ -72,3 +73,4 @@ ExperimentArguments:
         target_data: 'cora+citeseer+wikics+instagram+photo+computer+history'
         test_ratio: 0.2
         eval_seeds: [0, 1, 2, 3, 4]
+        eval_every_epochs: 1

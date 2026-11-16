@@ -199,7 +199,7 @@ def train(
         kind=model_args.encoder,
         act_fn=F.elu,
     ).to(device)
-    loss_fn = SSGELoss(lambd=model_args.lam).to(device)
+    loss_fn = SSGELoss(lambd=model_args.lam, norm_mode='batch+l2').to(device)
     optim = Adam(
         encoder.parameters(), lr=model_args.lr, weight_decay=model_args.weight_decay
     )

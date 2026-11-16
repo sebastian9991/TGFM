@@ -1,8 +1,6 @@
-"""Adversarial robustness of zero-shot node classification (LeVLJEPA Sec. 5.3 analog).
+"""Adversarial robustness of zero-shot node classification.
 
-LeVLJEPA evaluates background robustness by training a probe on Original
-ImageNet-9 features and evaluating, without retraining, on Mixed-Same and
-Mixed-Rand recompositions. The graph analog replaces the background swap with
+ The graph analog replaces the background swap with
 a bounded perturbation of the ego-subgraph and the linear probe with the
 zero-shot readout, so nothing is retrained on the perturbed inputs. This is an
 evasion attack in the sense of Zuegner et al. (KDD 2018): the encoder is
@@ -30,12 +28,6 @@ LeVLJEPA's Mixed-Rand images do not depend on which encoder is evaluated:
 Run each arm with the same three and both encoders see the same perturbed
 inputs. White-box (--surrogate-model same) measures worst-case robustness but
 is not comparable across models; report both.
-
-GraphCLIP is scored with direction 'direct' because it has no cross-modal
-predictors -- and that is the correct readout for it, since InfoNCE is a
-function of the cross-modal Gram. LeGTJEPA keeps its configured direction.
-State the asymmetry in the paper: each method is scored by the quantity its
-objective identifies.
 """
 
 import argparse
@@ -144,10 +136,7 @@ def build_model(
         )
     else:
         ckpt_path = (
-            Path(str(meta_args.root_dir))
-            / 'weights'
-            / experiment
-            / 'legtjepa.pt'
+            Path(str(meta_args.root_dir)) / 'weights' / experiment / 'legtjepa.pt'
         )
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
     model.load_state_dict(ckpt['model_state_dict'])
@@ -353,8 +342,7 @@ def resolve_targets(
     generator: torch.Generator,
 ) -> Tensor:
     """Shared target set across arms: the perturbed inputs must not depend on
-    which encoder is being evaluated (LeVLJEPA Sec. 5.3 uses identical images
-    for every backbone).
+    which encoder is being evaluated.
     """
     cache = (
         Path(args.targets_file) / f'{name}_seed{seed}.pt' if args.targets_file else None

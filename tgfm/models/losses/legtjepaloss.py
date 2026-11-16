@@ -42,11 +42,36 @@ def gather_embeddings(z: Tensor) -> Tensor:
 
 
 class LeGTJEPALoss(torch.nn.Module):
+    """Pairwise L_cross + SIGReg over the active modalities (graph, text, image).
+
+    Two modalities (the original objective, unchanged):
+        L_cross = ||h_g(z_g) - sg(z_t)||^2 + ||h_t(z_t) - sg(z_g)||^2
+
+    Three modalities, the pairwise extension used as the baseline against the
+    Gramian volume: every active anchor a predicts every other modality b,
+
+        L_cross = sum_a sum_{b != a} mean_i ||h_a(z_i^a) - sg(z_i^b)||^2
+
+    so k anchors x (k-1) targets = k(k-1) MSE terms, each per sample (no B^2
+    term). One predictor per modality serves all of that modality's targets,
+    matching the volume objective, where h_a's output is the single live column
+    of A^(a). Anchors whose projection is frozen are dropped, as in the volume
+    loss; their embeddings still serve as detached targets.
+    """
+
     def __init__(self, args: LeGTJEPAArguments) -> None:
         super().__init__()
+        self.use_text = getattr(args, 'use_text', True)
+        self.use_image = getattr(args, 'use_image', False)
+        self.text_branch_active = self.use_text and not args.freeze_text_projection
+        self.image_branch_active = self.use_image and not getattr(
+            args, 'freeze_image_projection', False
+        )
         self.lambda_g = args.lambda_graph
-        self.lambda_t = 0.0 if args.freeze_text_projection else args.lambda_text
-        self.text_branch_active = not args.freeze_text_projection
+        self.lambda_t = args.lambda_text if self.text_branch_active else 0.0
+        self.lambda_i = (
+            getattr(args, 'lambda_image', 0.0) if self.image_branch_active else 0.0
+        )
         self.sigreg = SIGReg(
             num_slices=args.sigreg_num_slices,
             num_quad_points=args.sigreg_num_quad_points,
@@ -54,31 +79,54 @@ class LeGTJEPALoss(torch.nn.Module):
         )
 
     def forward(self, out: Dict[str, Tensor]) -> Dict[str, Tensor]:
-        z_g, z_t = out['z_g'], out['z_t']
+        z_g = out['z_g']
+        zero = torch.zeros((), device=z_g.device)
 
-        # sum over dim, mean over batch: per-sample squared L2 as in Eq. 5.
-        cross = mse_loss(out['pred_g'], z_t.detach(), reduction='none').sum(-1).mean()
-        if self.text_branch_active:
-            cross = (
-                cross
-                + mse_loss(out['pred_t'], z_g.detach(), reduction='none').sum(-1).mean()
+        # (name, embedding, prediction, anchor active, SIGReg weight)
+        modalities = [('graph', z_g, out['pred_g'], True, self.lambda_g)]
+        if self.use_text:
+            modalities.append(
+                (
+                    'text',
+                    out['z_t'],
+                    out.get('pred_t'),
+                    self.text_branch_active,
+                    self.lambda_t,
+                )
+            )
+        if self.use_image:
+            modalities.append(
+                (
+                    'image',
+                    out['z_image'],
+                    out.get('pred_image'),
+                    self.image_branch_active,
+                    self.lambda_i,
+                )
             )
 
-        sigreg_g = self.sigreg(gather_embeddings(z_g))
-        sigreg_t = (
-            self.sigreg(gather_embeddings(z_t))
-            if self.lambda_t > 0
-            else torch.zeros((), device=z_g.device)
-        )
+        # sum over dim, mean over batch: per-sample squared L2 as in Eq. 5.
+        cross = zero
+        for a, (_, _, pred_a, active, _) in enumerate(modalities):
+            if not active:
+                continue
+            for b, (_, z_b, _, _, _) in enumerate(modalities):
+                if b != a:
+                    cross = (
+                        cross
+                        + mse_loss(pred_a, z_b.detach(), reduction='none')
+                        .sum(-1)
+                        .mean()
+                    )
 
-        total = (
-            (1.0 - self.lambda_g - self.lambda_t) * cross
-            + self.lambda_g * sigreg_g
-            + self.lambda_t * sigreg_t
-        )
-        return {
-            'loss': total,
-            'cross': cross.detach(),
-            'sigreg_graph': sigreg_g.detach(),
-            'sigreg_text': sigreg_t.detach(),
-        }
+        lambda_sum = sum(m[4] for m in modalities)
+        assert lambda_sum <= 1
+        total = (1.0 - lambda_sum) * cross
+        logs: Dict[str, Tensor] = {'cross': cross.detach()}
+        for name, z, _, _, lam in modalities:
+            sig = self.sigreg(gather_embeddings(z)) if lam > 0 else zero
+            total = total + lam * sig
+            logs[f'sigreg_{name}'] = sig.detach()
+        if 'sigreg_text' not in logs:
+            logs['sigreg_text'] = zero
+        return {'loss': total} | logs

@@ -16,6 +16,14 @@ Table rows (model_args.model selects the method):
     GraphCLIP model='GraphCLIP' (from scratch, GraphCLIP GPS + InfoNCE)
         G-T     use_text=True   use_image=False  graph_feat='text'
         G-I     use_text=False  use_image=True   graph_feat='image'
+    Pairwise  model='LeGTJEPA', align_objective='mse'  (pairwise L_cross + SIGReg)
+    InfoNCE   model='LeGTJEPA', align_objective='infonce' (symmetric InfoNCE
+              summed over all modality pairs, on the LeGTJEPA towers; the
+              k = 3 contrastive arm of the cost comparison)
+
+Timing: StepTimer logs data/forward/loss/backward/optim and peak memory per
+epoch (TIMING lines in the log, time/* in wandb). timing_max_steps > 0 ends
+each epoch early and skips the probe, for timing-only runs.
 
 Launch with:
     torchrun --standalone --nproc_per_node=4 \
@@ -49,6 +57,7 @@ from tgfm.evaluation.mm_linear_probe import evaluate_dataset as probe_dataset
 from tgfm.evaluation.mm_lp_linear_probe import evaluate_dataset as lp_probe_dataset
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.models.losses.graphclip_loss import GraphCLIPLoss
+from tgfm.models.losses.infonce_mm import MultiModalInfoNCELoss
 from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
 from tgfm.models.losses.volumeloss import LeGTJEPAVolumeLoss
 from tgfm.utils.args import (
@@ -67,6 +76,7 @@ from tgfm.utils.mm_features import (
 from tgfm.utils.mm_sampler import parse_mm_target_data
 from tgfm.utils.path import get_root_dir
 from tgfm.utils.seed import seed_everything
+from tgfm.utils.timing import StepTimer, config_fingerprint, log_fingerprint
 from tgfm.views.augmentations import batch_graph_aug
 
 parser = argparse.ArgumentParser(
@@ -142,7 +152,7 @@ def load_source_graphs(
 
 def train_epoch(
     model: DDP,
-    criterion: Union[LeGTJEPALoss, LeGTJEPAVolumeLoss, GraphCLIPLoss],
+    criterion: torch.nn.Module,
     loader: DataLoader,
     optimizer: torch.optim.AdamW,
     scheduler: LambdaLR,
@@ -154,11 +164,14 @@ def train_epoch(
     epoch: int,
     log_every_steps: int,
     verbose: bool,
-) -> float:
-    """One pass over the rank-local shard; returns the epoch's mean loss."""
+    timer: StepTimer,
+) -> Tuple[float, dict]:
+    """One pass over the rank-local shard; returns (mean loss, timing stats)."""
     assert isinstance(model_args, LeGTJEPAArguments)
     model.train()
     total_loss, num_batches = 0.0, 0
+    max_steps = model_args.timing_max_steps
+    timer.epoch_begin()
 
     pbar = tqdm(
         loader,
@@ -170,6 +183,9 @@ def train_epoch(
     )
 
     for step, batch in enumerate(pbar):
+        if max_steps > 0 and step >= max_steps:
+            break  # every rank has the same len(loader), so all stop together
+        timer.step_begin()
         optimizer.zero_grad(set_to_none=True)
 
         batch = batch.to(device, non_blocking=True)
@@ -188,10 +204,20 @@ def train_epoch(
                 batch, model_args.aug_feat_drop, model_args.aug_edge_drop
             )
 
+        timer.mark('data')
+
         if not model_args.adversarial:
-            losses = criterion(model(batch, text_x, image_x=image_x))
+            out = model(batch, text_x, image_x=image_x)
+            timer.mark('forward')
+            losses = criterion(out)
+            timer.mark('loss')
             losses['loss'].backward()
+            timer.mark('backward')
         else:
+            # m fused forward/backward passes: the breakdown collapses into
+            # backward; step_ms stays exact.
+            timer.mark('forward')
+            timer.mark('loss')
             m, eps = model_args.adv_steps, model_args.adv_step_size
             x_clean = batch.x
             perturb = torch.empty_like(x_clean).uniform_(-eps, eps).requires_grad_()
@@ -205,9 +231,12 @@ def train_epoch(
                         perturb += eps * perturb.grad.sign()
                         perturb.grad.zero_()
             batch.x = x_clean
+            timer.mark('backward')
 
         optimizer.step()
         scheduler.step()
+        timer.mark('optim')
+        timer.step_end(n_items=int(batch.num_graphs))
 
         total_loss += losses['loss'].detach().item()
         num_batches += 1
@@ -244,10 +273,13 @@ def train_epoch(
                     }
                 )
 
+    # epoch_end reduces across ranks itself, so every rank must reach it.
+    timing = timer.epoch_end()
+
     # Average across ranks so the logged epoch loss reflects the global shard.
     loss_tensor = torch.tensor(total_loss / max(1, num_batches), device=device)
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.AVG)
-    return loss_tensor.item()
+    return loss_tensor.item(), timing
 
 
 def run_legtjepa(
@@ -306,7 +338,16 @@ def run_legtjepa(
         for branch_name, module in frozen_branches:
             for param in module.parameters():
                 param.requires_grad = False
-            logging.info('%s frozen (its anchor is dropped from the loss).', branch_name)
+            logging.info(
+                '%s frozen (its anchor is dropped from the loss).', branch_name
+            )
+        if model_args.align_objective == 'infonce':
+            # InfoNCE acts on the projections only; predictors get no gradient.
+            for name in ('graph_predictor', 'text_predictor', 'image_predictor'):
+                if hasattr(legtjepa, name):
+                    for param in getattr(legtjepa, name).parameters():
+                        param.requires_grad = False
+            logging.info('Predictors frozen (unused by align_objective=infonce).')
     # Projections and predictors use BatchNorm; sync statistics across the
     # per-rank batches so SIGReg sees consistent normalization.
     legtjepa = torch.nn.SyncBatchNorm.convert_sync_batchnorm(legtjepa)
@@ -319,24 +360,44 @@ def run_legtjepa(
         find_unused_parameters=False,
         gradient_as_bucket_view=True,
     )
-    criterion: Union[LeGTJEPALoss, LeGTJEPAVolumeLoss, GraphCLIPLoss]
+    criterion: Union[
+        LeGTJEPALoss, LeGTJEPAVolumeLoss, GraphCLIPLoss, MultiModalInfoNCELoss
+    ]
     if is_graphclip:
         criterion = GraphCLIPLoss()
+    elif model_args.align_objective == 'infonce':
+        criterion = MultiModalInfoNCELoss(model_args)
     elif model_args.align_objective == 'volume':
         criterion = LeGTJEPAVolumeLoss(model_args)
     else:
         criterion = LeGTJEPALoss(model_args)
     criterion = criterion.to(device)
+    # MultiModalInfoNCELoss owns the learnable temperature; the others have
+    # no parameters.
+    criterion_params = [p for p in criterion.parameters() if p.requires_grad]
+    n_trainable = sum(p.numel() for p in model.module.trainable_parameters()) + sum(
+        p.numel() for p in criterion_params
+    )
     if global_rank == 0:
-        n_trainable = sum(p.numel() for p in model.module.trainable_parameters())
         logging.info(f'Model loaded. Trainable parameters: {n_trainable}')
         logging.info(f'Aligning with: {model_args.align_objective}')
         logging.info(f'Criterion: {type(criterion).__name__}')
         logging.info(f'LR schedule: {model_args.lr_schedule}')
         logging.info(f'Probe representation: {model_args.probe_representation}')
+        log_fingerprint(config_fingerprint(model_args, world_size, n_trainable))
+
+    timer = StepTimer(
+        device,
+        world_size=world_size,
+        sample_every=model_args.timing_sample_every,
+        warmup=model_args.timing_warmup_steps,
+        enabled=model_args.timing_enabled,
+    )
 
     optimizer = torch.optim.AdamW(
-        model.module.trainable_parameters(),
+        # Criterion parameters go last so existing checkpoints keep their
+        # Adam-state positions.
+        list(model.module.trainable_parameters()) + criterion_params,
         lr=model_args.lr,
         weight_decay=model_args.weight_decay,
     )
@@ -396,7 +457,7 @@ def run_legtjepa(
         )
 
     for epoch in epoch_pbar:
-        epoch_loss = train_epoch(
+        epoch_loss, timing = train_epoch(
             model=model,
             criterion=criterion,
             loader=loader,
@@ -410,13 +471,18 @@ def run_legtjepa(
             epoch=epoch,
             log_every_steps=model_args.log_every_steps,
             verbose=verbose,
+            timer=timer,
         )
 
         if global_rank == 0:
             epoch_pbar.set_postfix({'epoch_loss': f'{epoch_loss:.4f}'})
             logging.info(f'Epoch: {epoch:02d}, Loss: {epoch_loss:.4f}')
+            logging.info(f'TIMING epoch {epoch:02d}: {StepTimer.format(timing)}')
             if verbose:
                 wandb.log({'train/epoch_loss': epoch_loss, 'train/epoch': epoch})
+                wandb.log(
+                    {f'time/{k}': v for k, v in timing.items()} | {'train/epoch': epoch}
+                )
             torch.save(
                 {
                     'epoch': epoch,
@@ -435,7 +501,11 @@ def run_legtjepa(
         #   'node' -> NC accuracy (ele-fashion, books-nc)
         #   'link' -> LP MRR/Hits against the shipped negatives (Table 5)
         # Both probes restore the model's training mode on exit.
-        if global_rank == 0 and epoch % data_args.eval_every_epochs == 0:
+        if (
+            global_rank == 0
+            and model_args.timing_max_steps == 0
+            and epoch % data_args.eval_every_epochs == 0
+        ):
             logging.info(f'------------Evaluate-{epoch}------------')
             is_lp = data_args.task_name == 'link'
             probe_res = {}

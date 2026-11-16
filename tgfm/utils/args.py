@@ -447,8 +447,16 @@ class LeGTJEPAArguments(ModelArguments):
     #   'image'      DINOv2 per node (G-I)        graph_in_dim = image_in_dim
     #   'text_image' [T5 || DINOv2] per node      graph_in_dim = sum
     graph_feat: str = 'text'
-    
-        # --- convergence monitoring (main.py) ---
+
+    # --- step timing (mm_main.py; tools/bench_e2e_cost.py) ---
+    timing_enabled: bool = True
+    timing_warmup_steps: int = 10
+    timing_sample_every: int = 50
+    # >0 ends each epoch after this many steps and skips the probe: a
+    # timing-only run at the real config, data and world size.
+    timing_max_steps: int = 0
+
+    # --- convergence monitoring (main.py) ---
     # Evaluate at step 0, at log-spaced steps first, 2*first, 4*first, ...,
     # every conv_eval_every_steps (0 disables that part), and at the last step.
     conv_eval: bool = False
@@ -461,7 +469,9 @@ class LeGTJEPAArguments(ModelArguments):
 
     def __post_init__(self) -> None:
         if self.lr_schedule not in ('warmup_cosine', 'constant'):
-            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+            raise ValueError(
+                f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}'
+            )
         if self.probe_representation not in ('projection', 'backbone'):
             raise ValueError(
                 'probe_representation must be projection|backbone, got '
@@ -537,11 +547,17 @@ class GraphCLIPMMArguments(LeGTJEPAArguments):
 
     def __post_init__(self) -> None:
         if self.lr_schedule not in ('warmup_cosine', 'constant'):
-            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+            raise ValueError(
+                f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}'
+            )
         if self.use_text == self.use_image:
-            raise ValueError('GraphCLIP is two-tower: set exactly one of use_text / use_image.')
+            raise ValueError(
+                'GraphCLIP is two-tower: set exactly one of use_text / use_image.'
+            )
         if self.text_input_mode != 'feature':
-            raise ValueError('GraphCLIP on MM-Graph uses precomputed features (text_input_mode="feature").')
+            raise ValueError(
+                'GraphCLIP on MM-Graph uses precomputed features (text_input_mode="feature").'
+            )
         expected_feat = 'text' if self.use_text else 'image'
         if self.graph_feat != expected_feat:
             raise ValueError(
@@ -549,7 +565,9 @@ class GraphCLIPMMArguments(LeGTJEPAArguments):
             )
         expected_dim = self.text_in_dim if self.use_text else self.image_in_dim
         if self.graph_in_dim != expected_dim:
-            raise ValueError(f'graph_in_dim={self.graph_in_dim}, node features are {expected_dim}-d')
+            raise ValueError(
+                f'graph_in_dim={self.graph_in_dim}, node features are {expected_dim}-d'
+            )
 
 
 @dataclass

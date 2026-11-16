@@ -8,7 +8,7 @@ MetaArguments:
 
 ExperimentArguments:
   exp_args:
-    LeGraph:
+    LeGTJEPA:
       model_args:
         model: "LeGTJEPA"
         source_data: "ogbn-arxiv+arxiv_2023+pubmed+ogbn-products+reddit"

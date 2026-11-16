@@ -43,7 +43,7 @@ ExperimentArguments:
         sigreg_t_max: 4.0
         lr: 0.0005
         weight_decay: 1.0e-05
-        epochs: 30
+        epochs: 10
         warmup_steps: 1000
         text_input_mode: 'feature'
         text_in_dim: 768

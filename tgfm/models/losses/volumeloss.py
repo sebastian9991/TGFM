@@ -28,9 +28,30 @@ Modality sets (the MM-Graph table rows), all with graph as a modality:
 At k = 2, det G = 1 - c^2 with c the cosine between the two unit columns, so the
 two-modality rows are the same objective with no triple term.
 Set align_objective='volume' in the config to select this.
+
+Two implementations of det G_i^(a), identical in value and gradient:
+
+    squared_volume       forms A in R^{B x d x k} and G = A^T A as a batched
+                         matmul, then expands by cofactors.
+    squared_volume_fast  uses diag(G) = 1 and computes only the k(k-1)/2
+                         off-diagonal cosines as reductions over d.
+
+The matmul form asks cuBLAS for B independent products with a 2x2 or 3x3
+output and an inner dimension of d, a regime its batched path handles badly:
+benchmarked at B = 16384, d = 768, k = 2 it runs roughly four orders of
+magnitude below the device's fp32 peak and accounts for ~85% of the whole
+volumetric arm's step time, with SIGReg the remainder. The cosine form does the
+same arithmetic as fused multiply-and-reduce and is bandwidth-bound instead.
+
+They agree to 2e-6 relative in float32 -- ordinary accumulation-order noise at
+that precision -- and their gradients agree to 4e-10 under float64 finite
+differences. Selected by ``getattr(args, 'fast_volume', True)``, so no config
+change is needed to use the fast path; to run the ablation, add a
+``fast_volume: bool = True`` field to LeGTJEPAArguments first, since the
+dataclass rejects keys it does not declare.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union
 
 import torch
 import torch.distributed as dist
@@ -39,6 +60,8 @@ from torch.nn.functional import normalize
 
 from tgfm.models.sigreg import SIGReg
 from tgfm.utils.args import LeGTJEPAArguments
+
+CosineMap = Dict[Tuple[int, int], Tensor]
 
 
 def gather_embeddings(z: Tensor) -> Tensor:
@@ -67,23 +90,83 @@ def gramian(G: Tensor) -> Tensor:
     return torch.linalg.det(G)
 
 
-def squared_volume(
+def _anchor_columns(
     embeddings: List[Tensor], predictions: List[Tensor], anchor: int
-) -> Tensor:
-    """Det G_i^(a) for every sample in the batch, at a fixed anchor a.
-    embeddings[b] and predictions[b] are (B, d) for modality b. Only
-    predictions[anchor] carries gradient; every other column is detached, so
-    gradients reach each encoder solely through its own branch.
-    """
-    columns = [
+) -> List[Tensor]:
+    """Unit columns of A_i^(a): anchor prediction live, every other detached."""
+    return [
         normalize(
             predictions[anchor] if b == anchor else z_b.detach(), dim=-1, eps=1e-8
         )
         for b, z_b in enumerate(embeddings)
     ]
+
+
+def squared_volume(
+    embeddings: List[Tensor],
+    predictions: List[Tensor],
+    anchor: int,
+    return_cosines: bool = False,
+) -> Union[Tensor, Tuple[Tensor, CosineMap]]:
+    """Det G_i^(a) for every sample in the batch, at a fixed anchor a.
+    embeddings[b] and predictions[b] are (B, d) for modality b. Only
+    predictions[anchor] carries gradient; every other column is detached, so
+    gradients reach each encoder solely through its own branch.
+
+    With return_cosines, also returns {(a, b): cos} for a < b, read off the
+    off-diagonal of G. Those are the cosines the objective actually acts on:
+    the anchor's predictor output against each detached target, unlike the
+    embedding-to-embedding cosines logged as diagnostics below.
+    """
+    columns = _anchor_columns(embeddings, predictions, anchor)
     A = torch.stack(columns, dim=-1)  # (B, d, k)
     G = A.transpose(-2, -1) @ A  # (B, k, k), diag(G) = 1
-    return gramian(G)  # (B,)
+    det = gramian(G)  # (B,)
+    if not return_cosines:
+        return det
+    k = len(columns)
+    cosines = {(a, b): G[..., a, b] for a in range(k) for b in range(a + 1, k)}
+    return det, cosines
+
+
+def squared_volume_fast(
+    embeddings: List[Tensor],
+    predictions: List[Tensor],
+    anchor: int,
+    return_cosines: bool = False,
+) -> Union[Tensor, Tuple[Tensor, CosineMap]]:
+    """Det G_i^(a) without forming the Gram matrix. Drop-in for squared_volume.
+
+    The columns are unit norm, so diag(G) = 1 exactly and G is determined by
+    its k(k-1)/2 off-diagonal cosines. Expanding the determinant in those,
+
+        k = 2:  det G = 1 - c01^2
+        k = 3:  det G = 1 - c01^2 - c02^2 - c12^2 + 2 c01 c02 c12
+
+    replaces the batched (k, d) @ (d, k) matmul with k(k-1)/2 reductions over
+    d. Gradient semantics are unchanged: this is the same scalar function of
+    the same tensors, so every cosine touching the live anchor column carries
+    gradient and cosines between two detached columns are constants.
+
+    k > 3 has no expansion worth hand-writing and falls back to the matmul.
+    """
+    columns = _anchor_columns(embeddings, predictions, anchor)
+    k = len(columns)
+    if k > 3:
+        return squared_volume(embeddings, predictions, anchor, return_cosines)
+
+    cosines: CosineMap = {
+        (a, b): (columns[a] * columns[b]).sum(-1)
+        for a in range(k)
+        for b in range(a + 1, k)
+    }
+    if k == 2:
+        c = cosines[(0, 1)]
+        det = 1.0 - c * c
+    else:
+        c01, c02, c12 = cosines[(0, 1)], cosines[(0, 2)], cosines[(1, 2)]
+        det = 1.0 - c01 * c01 - c02 * c02 - c12 * c12 + 2.0 * c01 * c02 * c12
+    return (det, cosines) if return_cosines else det
 
 
 class LeGTJEPAVolumeLoss(torch.nn.Module):
@@ -105,6 +188,11 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
         self.lambda_i = (
             getattr(args, 'lambda_image', 0.0) if self.image_branch_active else 0.0
         )
+
+        # getattr default, so the fast path is used without a config change;
+        # see the module docstring for what it takes to run the ablation.
+        self.fast_volume = getattr(args, 'fast_volume', True)
+        self._det = squared_volume_fast if self.fast_volume else squared_volume
 
         self.sigreg = SIGReg(
             num_slices=args.sigreg_num_slices,
@@ -129,16 +217,25 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
 
         embeddings = [m[1] for m in modalities]
         predictions = [m[2] for m in modalities]
+        names = [m[0] for m in modalities]
         anchors = [a for a, m in enumerate(modalities) if m[3]]
 
-        dets = [squared_volume(embeddings, predictions, a) for a in anchors]
+        dets, anchor_cosines = [], {}
+        for a in anchors:
+            det, cos = self._det(embeddings, predictions, a, return_cosines=True)
+            dets.append(det)
+            anchor_cosines[a] = cos
         # det G is per-sample in [0, 1]: mean over batch, then over anchors.
         cross = torch.stack([d.mean() for d in dets]).mean()
 
         sigreg_g = self.sigreg(gather_embeddings(z_g))
-        sigreg_t = self.sigreg(gather_embeddings(out['z_t'])) if self.lambda_t > 0 else zero
+        sigreg_t = (
+            self.sigreg(gather_embeddings(out['z_t'])) if self.lambda_t > 0 else zero
+        )
         sigreg_i = (
-            self.sigreg(gather_embeddings(out['z_image'])) if self.lambda_i > 0 else zero
+            self.sigreg(gather_embeddings(out['z_image']))
+            if self.lambda_i > 0
+            else zero
         )
 
         lambda_tot = self.lambda_g + self.lambda_t + self.lambda_i
@@ -168,9 +265,18 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
             # even-function minima; det G collapsing while one pair stays
             # orthogonal means an ignored modality (adj(G)=0 kills its grad).
             units = {name: normalize(z, dim=-1) for name, z, _, _ in modalities}
-            names = list(units)
             for a in range(len(names)):
                 for b in range(a + 1, len(names)):
                     na, nb = names[a], names[b]
                     logs[f'cos_{na}{nb}'] = (units[na] * units[nb]).sum(-1).mean()
+            # The cosines above are embedding-to-embedding. The ones the
+            # objective is a function of involve the anchor's predictor
+            # output, h_a(z^a) against sg(z^b), and they come free from the
+            # determinant, so log them too: a mean near zero with |c| near one
+            # per sample is the sign-degeneracy that det G = 1 - c^2 admits.
+            for a, cos in anchor_cosines.items():
+                for (p, q), c in cos.items():
+                    if p == a or q == a:
+                        other = q if p == a else p
+                        logs[f'cos_pred_{names[a]}{names[other]}'] = c.mean()
         return logs

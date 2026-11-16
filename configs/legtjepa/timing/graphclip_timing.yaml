@@ -1,0 +1,63 @@
+MetaArguments:
+  log_file_path: "graphclip_timing.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "graph_clip_datasets"
+  is_scratch_location: true
+  verbose: true
+  global_seed: 42
+
+ExperimentArguments:
+  exp_args:
+    GraphCLIP_timing:
+      model_args:
+        model: "LeGTJEPA"
+        align_objective: 'infonce'         # selects the GraphCLIP arm in main.py
+        source_data: "ogbn-arxiv+arxiv_2023+pubmed+ogbn-products+reddit"
+        batch_size: 450                    # per rank, identical in both files
+        max_text_length: 512
+        log_every_steps: 100
+
+        graph_in_dim: 384
+        graph_hidden_dim: 1024
+        graph_num_layers: 12               # identical in both files
+        graph_pe_dim: 8                    # GraphCLIP hardcodes 8
+        attn_type: 'multihead'             # GraphCLIP hardcodes multihead
+        attn_dropout: 0.0
+
+        text_model_id: 'sentence-transformers/all-MiniLM-L6-v2'
+        freeze_text_backbone: true
+
+        # Read only by the GramJEPA arm; kept identical so the files diff
+        # in align_objective alone.
+        embed_dim: 384
+        proj_hidden_dim: 2048
+        proj_dropout: 0.1
+        predictor_depth: 4
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.1
+
+        lambda_graph: 1.0e-3
+        lambda_text: 1.0e-3
+        sigreg_num_slices: 256
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+
+        lr: 5.0e-4
+        weight_decay: 1.0e-5
+        lr_schedule: 'warmup_cosine'
+        epochs: 3                          # report epochs 2-3; epoch 1 carries worker spin-up
+        warmup_steps: 1000
+
+        graph_aug: false                   # identical in both files
+        adversarial: false                 # identical in both files
+
+        zeroshot_direction: 'text_pred'    # GraphCLIP's predictors are identity, so this reduces to direct
+
+      data_args:
+        data_name: 'source_data'
+        task_name: 'node'
+        target_data: 'cora+citeseer+wikics+instagram+photo+computer+history'
+        test_ratio: 0.2
+        eval_seeds: [0, 1, 2, 3, 4]
+        eval_every_epochs: 100             # eval runs once, at the last epoch, outside the timer

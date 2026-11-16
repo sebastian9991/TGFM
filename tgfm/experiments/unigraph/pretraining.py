@@ -1,4 +1,4 @@
-"""Distributed step-based pretraining for UniGraph.
+"""Disrgtributed step-based pretraining for UniGraph.
 Launch with:
     torchrun --standalone --nproc_per_node=4 \
         tgfm/experiments/unigraph/pretraining.py \

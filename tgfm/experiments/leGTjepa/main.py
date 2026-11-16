@@ -45,6 +45,7 @@ from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir, get_scratch
 from tgfm.utils.process import parse_source_data  # from the GraphCLIP repo
 from tgfm.utils.seed import seed_everything
+from tgfm.utils.timing import StepTimer, config_fingerprint, log_fingerprint
 from tgfm.views.augmentations import batch_graph_aug
 
 parser = argparse.ArgumentParser(
@@ -122,11 +123,13 @@ def train_epoch(
     log_every_steps: int,
     max_text_length: int,
     verbose: bool,
-) -> float:
-    """One pass over the rank-local shard; returns the epoch's mean loss."""
+    timer: StepTimer,
+) -> Tuple[float, dict]:
+    """One pass over the rank-local shard; returns (mean loss, timing stats)."""
     assert isinstance(model_args, LeGTJEPAArguments)
     model.train()
     total_loss, num_batches = 0.0, 0
+    timer.epoch_begin()
 
     pbar = tqdm(
         loader,
@@ -138,6 +141,7 @@ def train_epoch(
     )
 
     for step, batch in enumerate(pbar):
+        timer.step_begin()
         optimizer.zero_grad(set_to_none=True)
 
         batch_t = tokenizer(
@@ -154,11 +158,25 @@ def train_epoch(
             batch = batch_graph_aug(
                 batch, model_args.aug_feat_drop, model_args.aug_edge_drop
             )
+        timer.mark('data')
 
         if not model_args.adversarial:
-            losses = criterion(model(batch, batch_t))
+            # Split so the alignment term's forward is timed on its own. Its
+            # backward is fused into the single backward() below and is not
+            # separable here; tools/bench_alignment_cost.py isolates it.
+            out = model(batch, batch_t)
+            timer.mark('forward')
+            losses = criterion(out)
+            timer.mark('loss')
             losses['loss'].backward()
+            timer.mark('backward')
         else:
+            # Under adversarial training the step is m fused forward/backward
+            # passes, so the breakdown collapses: forward and loss are recorded
+            # as empty and the whole loop lands in backward. step_ms and
+            # epoch_s stay exact.
+            timer.mark('forward')
+            timer.mark('loss')
             m, eps = model_args.adv_steps, model_args.adv_step_size
             x_clean = batch.x
             perturb = torch.empty_like(x_clean).uniform_(-eps, eps).requires_grad_()
@@ -172,9 +190,12 @@ def train_epoch(
                         perturb += eps * perturb.grad.sign()
                         perturb.grad.zero_()
             batch.x = x_clean
+            timer.mark('backward')
 
         optimizer.step()
         scheduler.step()
+        timer.mark('optim')
+        timer.step_end(n_items=int(batch.num_graphs))
 
         total_loss += losses['loss'].detach().item()
         num_batches += 1
@@ -223,10 +244,13 @@ def train_epoch(
                         }
                     )
 
+    # epoch_end reduces across ranks itself, so every rank must reach it.
+    timing = timer.epoch_end()
+
     # Average across ranks so the logged epoch loss reflects the global shard.
     loss_tensor = torch.tensor(total_loss / max(1, num_batches), device=device)
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.AVG)
-    return loss_tensor.item()
+    return loss_tensor.item(), timing
 
 
 def run_legtjepa(
@@ -297,10 +321,21 @@ def run_legtjepa(
         if model_args.align_objective == 'volume'
         else LeGTJEPALoss(model_args)
     ).to(device)
+    n_trainable = sum(p.numel() for p in model.module.trainable_parameters())
     if global_rank == 0:
-        n_trainable = sum(p.numel() for p in model.module.trainable_parameters())
         logging.info(f'Model loaded. Trainable parameters: {n_trainable}')
         logging.info(f'Aligning with: {model_args.align_objective}')
+        # Timing runs are only comparable across objectives when everything in
+        # this line matches except align_objective.
+        log_fingerprint(config_fingerprint(model_args, world_size, n_trainable))
+
+    timer = StepTimer(
+        device,
+        world_size=world_size,
+        sample_every=getattr(model_args, 'timing_sample_every', 50),
+        warmup=getattr(model_args, 'timing_warmup_steps', 10),
+        enabled=getattr(model_args, 'timing_enabled', True),
+    )
 
     optimizer = torch.optim.AdamW(
         model.module.trainable_parameters(),
@@ -337,7 +372,7 @@ def run_legtjepa(
             f'targets={data_args.target_data.split("+")}'
         )
     for epoch in epoch_pbar:
-        epoch_loss = train_epoch(
+        epoch_loss, timing = train_epoch(
             model=model,
             criterion=criterion,
             loader=loader,
@@ -353,13 +388,18 @@ def run_legtjepa(
             log_every_steps=model_args.log_every_steps,
             max_text_length=model_args.max_text_length,
             verbose=verbose,
+            timer=timer,
         )
 
         if global_rank == 0:
             epoch_pbar.set_postfix({'epoch_loss': f'{epoch_loss:.4f}'})
             logging.info(f'Epoch: {epoch:02d}, Loss: {epoch_loss:.4f}')
+            logging.info(f'TIMING epoch {epoch:02d}: {StepTimer.format(timing)}')
             if verbose:
                 wandb.log({'train/epoch_loss': epoch_loss, 'train/epoch': epoch})
+                wandb.log(
+                    {f'time/{k}': v for k, v in timing.items()} | {'train/epoch': epoch}
+                )
             torch.save(
                 {
                     'epoch': epoch,
