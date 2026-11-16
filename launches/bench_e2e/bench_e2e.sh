@@ -14,7 +14,7 @@
 # InfoNCE over all modality pairs vs pairwise L_cross + SIGReg, plus the
 # encoder-only baseline and the GraphCLIP model as published (k = 2).
 # k = 2 (G-T) and k = 3 (G-T-I), real MM-Graph batches, global B swept
-# 450..7200 on 4 GPUs under DDP exactly as in mm_main.py.
+# 900..7200 (225..1800 per rank) on 4 GPUs under DDP exactly as in mm_main.py.
 #
 #   Phase 1  matched encoders (12-layer GPS, 1024 wide = GraphCLIP Base):
 #            only the objective differs between arms.  -> the comparison table
@@ -31,7 +31,7 @@ cd "${REPO}"
 TARGET_BRANCH="${TARGET_BRANCH:-br_e2e_cost_bench}"
 ENTRY="tgfm/tools/bench_e2e_cost.py"
 SEEDS="${SEEDS:-0 1 2}"
-BATCHES="${BATCHES:-450 900 1800 3600 7200}"
+BATCHES="${BATCHES:-900 1800 3600 7200}"
 WARMUP="${WARMUP:-20}"
 ITERS="${ITERS:-100}"
 OUT_DIR="${OUT_DIR:-results/bench_e2e/${SLURM_JOB_ID:-local}}"

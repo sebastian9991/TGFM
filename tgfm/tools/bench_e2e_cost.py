@@ -128,7 +128,7 @@ parser.add_argument(
     '--batches',
     type=int,
     nargs='+',
-    default=[450, 900, 1800, 3600, 7200],
+    default=[900, 1800, 3600, 7200],
     help='GLOBAL batch sizes (split across ranks under torchrun).',
 )
 parser.add_argument('--warmup', type=int, default=20)
