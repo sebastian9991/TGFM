@@ -52,7 +52,7 @@ echo "commit=$(git rev-parse --short HEAD) branch=$(git rev-parse --abbrev-ref H
 nvidia-smi --query-gpu=name,memory.total --format=csv
 
 # Phase 1: matched encoders, all arms, B and k sweeps.
-uv run --group graphclip torchrun --standalone --nproc_per_node="${NGPU}" \
+uv run --no-sync --group graphclip torchrun --standalone --nproc_per_node="${NGPU}" \
     "${ENTRY}" \
     --data real \
     --arms volume pairwise infonce encoder_only graphclip \
@@ -64,7 +64,7 @@ uv run --group graphclip torchrun --standalone --nproc_per_node="${NGPU}" \
     --emit-markdown "${OUT_DIR}/matched.md"
 
 # Phase 2: GramJEPA at its tuned training configs and batch.
-uv run --group graphclip torchrun --standalone --nproc_per_node="${NGPU}" \
+uv run --no-sync --group graphclip torchrun --standalone --nproc_per_node="${NGPU}" \
     "${ENTRY}" \
     --data real \
     --k2-config configs/gramJEPA/mm/gramjepa_gt_tuned.yaml \
