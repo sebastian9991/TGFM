@@ -30,7 +30,10 @@ export MASTER_PORT=$(expr 10000 + $(echo -n $SLURM_JOBID | tail -c 4))
 export NCCL_DEBUG=INFO
 export NCCL_DEBUG_SUBSYS=INIT,NET
 
-OUT_DIR="results/bench_e2e/multinode_B14400_${SLURM_JOB_ID}"
+# Override per submission, e.g. K=3 ARMS="encoder_only volume pairwise infonce" sbatch ...
+K="${K:-2 3}"
+ARMS="${ARMS:-volume pairwise infonce encoder_only graphclip}"
+OUT_DIR="results/bench_e2e/multinode_B14400_k${K// /}_${SLURM_JOB_ID}"
 mkdir -p "$OUT_DIR" logs
 
 echo "Master: $MASTER_ADDR:$MASTER_PORT"
@@ -47,8 +50,8 @@ srun --gres-flags=allow-task-sharing bash -c "
         --master_port=$MASTER_PORT \
         tgfm/tools/bench_e2e_cost.py \
         --data real \
-        --arms volume pairwise infonce encoder_only graphclip \
-        --k 2 3 \
+        --arms $ARMS \
+        --k $K \
         --batches 14400 \
         --seeds 0 \
         --warmup 20 --iters 100 \
