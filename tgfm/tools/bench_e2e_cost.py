@@ -161,6 +161,25 @@ parser.add_argument(
     default=0,
     help='Override graph_num_layers (0 keeps the config). Debug only.',
 )
+parser.add_argument(
+    '--checkpoint-encoder',
+    action='store_true',
+    help='Activation checkpointing on every graph conv layer. Same math, about '
+    'one extra encoder forward per step, several times less activation memory: '
+    'lets the per-GPU batch, and so the global B, grow on the same hardware. '
+    'Applied identically to every arm.',
+)
+parser.add_argument(
+    '--emulate-world',
+    type=int,
+    default=1,
+    help='Single process only. Emulate the per-GPU cost of a W-GPU DDP job: the '
+    'encoder runs on B/W samples, and every cross-rank gather in the losses '
+    '(InfoNCE logits, SIGReg) is replaced by tiling the local embeddings W times, '
+    'so the loss sees the full global B exactly as each rank would. Leaves out '
+    'communication time and SyncBatchNorm. Use for global B beyond what the real '
+    'GPUs can hold; an OOM is caught cleanly, unlike under torchrun.',
+)
 parser.add_argument('--out', default='', help='Write raw results as JSON (rank 0).')
 parser.add_argument(
     '--emit-markdown', default='', help='Write the summary table (rank 0).'
@@ -227,8 +246,67 @@ class EncoderOnlyLoss(torch.nn.Module):
         return {'loss': loss}
 
 
+class _Checkpointed(torch.nn.Module):
+    """Recompute the wrapped layer's activations in backward instead of storing them."""
+
+    def __init__(self, layer: torch.nn.Module) -> None:
+        super().__init__()
+        self.layer = layer
+
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
+        from torch.utils.checkpoint import checkpoint
+
+        # Non-reentrant: works under DDP and restores the RNG state, so dropout
+        # masks match between the forward and the recompute.
+        return checkpoint(self.layer, *args, use_reentrant=False, **kwargs)
+
+
+def checkpoint_graph_convs(model: torch.nn.Module) -> int:
+    """Wrap every layer of every ``convs`` ModuleList (LeGTJEPA and GraphCLIP GPS)."""
+    n = 0
+    for module in list(model.modules()):
+        convs = getattr(module, 'convs', None)
+        if isinstance(convs, torch.nn.ModuleList):
+            for i, layer in enumerate(convs):
+                if not isinstance(layer, _Checkpointed):
+                    convs[i] = _Checkpointed(layer)
+                    n += 1
+    if n == 0:
+        raise RuntimeError('--checkpoint-encoder: no graph conv layers found to wrap')
+    return n
+
+
+def emulate_gathers(world: int) -> None:
+    """Make every loss module's gather_embeddings tile the local batch W times.
+
+    The tiled copies keep autograd, so the backward through the B x B logits
+    (InfoNCE) and the B-sample SIGReg statistics is the per-rank work of a real
+    W-rank job. Values are not meaningful (rows repeat); costs are.
+    """
+    import tgfm.models.losses.infonce_mm as m_infonce
+    import tgfm.models.losses.legtjepaloss as m_pair
+    import tgfm.models.losses.volumeloss as m_vol
+
+    def tiled(z: Tensor) -> Tensor:
+        return z.repeat(world, 1)
+
+    mods = [m_infonce, m_pair, m_vol]
+    try:
+        import tgfm.models.losses.graphclip_loss as m_gc
+
+        mods.append(m_gc)
+    except Exception:  # vendored GraphCLIP absent; its arm is skipped anyway
+        pass
+    for mod in mods:
+        mod.gather_embeddings = tiled
+
+
 def build_model(
-    args: LeGTJEPAArguments, arm: str, device: torch.device, world_size: int
+    args: LeGTJEPAArguments,
+    arm: str,
+    device: torch.device,
+    world_size: int,
+    checkpoint_encoder: bool = False,
 ) -> Tuple[torch.nn.Module, torch.nn.Module, torch.optim.Optimizer]:
     if arm == 'graphclip':
         from tgfm.evaluation.graphclip_mm_adapter import GraphCLIPMM
@@ -257,6 +335,8 @@ def build_model(
             'infonce': MultiModalInfoNCELoss,
         }.get(arm, lambda _a: EncoderOnlyLoss())(args)
 
+    if checkpoint_encoder:
+        checkpoint_graph_convs(model)
     if world_size > 1:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model = model.to(device)
@@ -544,16 +624,22 @@ def main() -> None:
     )
     torch.backends.cuda.matmul.allow_tf32 = False  # match training defaults
     configs = {2: cli.k2_config, 3: cli.k3_config}
+    if cli.emulate_world > 1:
+        if world > 1:
+            raise ValueError('--emulate-world is single-process; do not use torchrun')
+        emulate_gathers(cli.emulate_world)
+    # Ranks the encoder is split over: real (torchrun) or emulated.
+    split = world * cli.emulate_world
     results: List[Dict[str, Any]] = []
 
     for k in cli.k:
         _, base_cfg = load_yaml(configs[k])
         for B in cli.batches:
-            if B % world:
+            if B % split:
                 raise ValueError(
-                    f'global batch {B} not divisible by world size {world}'
+                    f'global batch {B} not divisible by {split} (real x emulated ranks)'
                 )
-            per_rank = B // world
+            per_rank = B // split
             for seed in cli.seeds:
                 batches: Optional[List[Batch]] = None
                 for arm in cli.arms:
@@ -569,7 +655,9 @@ def main() -> None:
                         'k': k,
                         'global_batch': B,
                         'per_rank_batch': per_rank,
-                        'world_size': world,
+                        'world_size': split,
+                        'emulated': cli.emulate_world > 1,
+                        'checkpoint_encoder': cli.checkpoint_encoder,
                         'seed': seed,
                         'data': cli.data,
                     }
@@ -594,7 +682,7 @@ def main() -> None:
                         rec |= batch_stats(batches)
                         torch.manual_seed(seed)
                         model, criterion, optimizer = build_model(
-                            args, arm, device, world
+                            args, arm, device, world, cli.checkpoint_encoder
                         )
                         rec['trainable_params'] = sum(
                             p.numel()
