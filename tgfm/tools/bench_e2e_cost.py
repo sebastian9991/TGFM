@@ -551,7 +551,7 @@ def summarize(results: List[Dict[str, Any]]) -> str:
         base = agg.get(('encoder_only', k, b))
         extra = (
             f"{a['step_ms'] - base['step_ms']:.1f}"
-            if base and arm != 'encoder_only'
+            if base and arm not in ('encoder_only', 'graphclip')  # graphclip: different model
             else '–'
         )
         lines.append(
@@ -613,6 +613,27 @@ def summarize(results: List[Dict[str, Any]]) -> str:
 # --------------------------------------------------------------------------- #
 # main
 # --------------------------------------------------------------------------- #
+
+
+def write_outputs(cli: Any, device: torch.device, results: List[Dict[str, Any]]) -> str:
+    """Write the JSON and markdown summary (rank 0); returns the table."""
+    table = summarize(results)
+    if cli.out:
+        Path(cli.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(cli.out).write_text(
+            json.dumps(
+                {
+                    'cli': vars(cli),
+                    'device': torch.cuda.get_device_name(device),
+                    'results': results,
+                },
+                indent=2,
+            )
+        )
+    if cli.emit_markdown:
+        Path(cli.emit_markdown).parent.mkdir(parents=True, exist_ok=True)
+        Path(cli.emit_markdown).write_text(table + '\n')
+    return table
 
 
 def main() -> None:
@@ -704,6 +725,23 @@ def main() -> None:
                         rec['status'] = 'ok'
                     except torch.cuda.OutOfMemoryError:
                         rec['status'] = 'oom'
+                        if is_dist():
+                            # Under DDP the other ranks are blocked inside a
+                            # collective this rank will never join, so the job
+                            # cannot continue: it would only hang until the
+                            # NCCL watchdog aborts it. Record and exit now.
+                            # Everything measured so far is already on disk.
+                            logging.error(
+                                f'OOM rank={rank} arm={arm} k={k} B={B} '
+                                f'per_rank={per_rank}; '
+                                f'{torch.cuda.max_memory_allocated(device) / 2**20:.0f} '
+                                'MiB allocated at peak. Exiting the DDP job.'
+                            )
+                            if rank == 0:
+                                write_outputs(cli, device, results + [rec])
+                            for h in logging.getLogger().handlers:
+                                h.flush()
+                            os._exit(3)
                     except (FileNotFoundError, ImportError) as e:
                         if arm != 'graphclip':
                             raise
@@ -734,6 +772,10 @@ def main() -> None:
                         )
                         logging.info(f'arm={arm:12s} k={k} B={B:6d} seed={seed}  {msg}')
                     results.append(rec)
+                    if rank == 0:
+                        # Rewrite after every configuration, so a crash later
+                        # in the sweep keeps everything measured before it.
+                        write_outputs(cli, device, results)
                 del batches
                 gc.collect()
 
@@ -744,21 +786,7 @@ def main() -> None:
                 results[0]['nodes_per_subgraph'],
                 results[0]['edges_per_subgraph'],
             )
-        table = summarize(results)
-        print('\n' + table)
-        if cli.out:
-            Path(cli.out).write_text(
-                json.dumps(
-                    {
-                        'cli': vars(cli),
-                        'device': torch.cuda.get_device_name(device),
-                        'results': results,
-                    },
-                    indent=2,
-                )
-            )
-        if cli.emit_markdown:
-            Path(cli.emit_markdown).write_text(table + '\n')
+        print('\n' + write_outputs(cli, device, results))
     if is_dist():
         dist.destroy_process_group()
 
