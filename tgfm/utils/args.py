@@ -447,8 +447,25 @@ class LeGTJEPAArguments(ModelArguments):
     #   'image'      DINOv2 per node (G-I)        graph_in_dim = image_in_dim
     #   'text_image' [T5 || DINOv2] per node      graph_in_dim = sum
     graph_feat: str = 'text'
-    
-        # --- convergence monitoring (main.py) ---
+
+    # --- regularizer: graph prior in place of SIGReg (tgfm/models/graph_prior.py) ---
+    # 'sigreg'  : SIGReg(Z)                     (paper Eq. 6, default)
+    # 'gsigreg' : SIGReg(W Z),  W = K^{-1/2}, K from the batch's induced subgraph
+    # 'gmmd'    : B * MMD^2(W Z, N(0, I)), Gaussian kernel, closed form
+    regularizer: str = 'sigreg'
+    graph_kernel: str = 'heat'  # heat: K = exp(-t L) | gmrf: K = eps (L + eps I)^-1
+    graph_kernel_t: float = 1.0
+    graph_kernel_eps: float = 1.0
+    gmmd_bandwidth: float = 1.0  # sigma^2 = gmmd_bandwidth * embed_dim
+    # 'random' : shuffled subgraphs (default; batches are near edgeless)
+    # 'cluster': each batch is groups of cluster_size centre nodes grown by BFS
+    #            from random seeds in the source graph, so batches carry edges.
+    batch_sampler: str = 'random'
+    cluster_size: int = 8
+    # Log the batch graph's edge density even when R_G is not used (baseline).
+    batch_graph_stats: bool = False
+
+    # --- convergence monitoring (main.py) ---
     # Evaluate at step 0, at log-spaced steps first, 2*first, 4*first, ...,
     # every conv_eval_every_steps (0 disables that part), and at the last step.
     conv_eval: bool = False
@@ -460,8 +477,18 @@ class LeGTJEPAArguments(ModelArguments):
     conv_zeroshot: bool = True
 
     def __post_init__(self) -> None:
+        if self.regularizer not in ('sigreg', 'gsigreg', 'gmmd'):
+            raise ValueError(
+                f'regularizer must be sigreg|gsigreg|gmmd, got {self.regularizer!r}'
+            )
+        if self.batch_sampler not in ('random', 'cluster'):
+            raise ValueError(
+                f'batch_sampler must be random|cluster, got {self.batch_sampler!r}'
+            )
         if self.lr_schedule not in ('warmup_cosine', 'constant'):
-            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+            raise ValueError(
+                f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}'
+            )
         if self.probe_representation not in ('projection', 'backbone'):
             raise ValueError(
                 'probe_representation must be projection|backbone, got '
@@ -537,11 +564,17 @@ class GraphCLIPMMArguments(LeGTJEPAArguments):
 
     def __post_init__(self) -> None:
         if self.lr_schedule not in ('warmup_cosine', 'constant'):
-            raise ValueError(f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}')
+            raise ValueError(
+                f'lr_schedule must be warmup_cosine|constant, got {self.lr_schedule!r}'
+            )
         if self.use_text == self.use_image:
-            raise ValueError('GraphCLIP is two-tower: set exactly one of use_text / use_image.')
+            raise ValueError(
+                'GraphCLIP is two-tower: set exactly one of use_text / use_image.'
+            )
         if self.text_input_mode != 'feature':
-            raise ValueError('GraphCLIP on MM-Graph uses precomputed features (text_input_mode="feature").')
+            raise ValueError(
+                'GraphCLIP on MM-Graph uses precomputed features (text_input_mode="feature").'
+            )
         expected_feat = 'text' if self.use_text else 'image'
         if self.graph_feat != expected_feat:
             raise ValueError(
@@ -549,7 +582,9 @@ class GraphCLIPMMArguments(LeGTJEPAArguments):
             )
         expected_dim = self.text_in_dim if self.use_text else self.image_in_dim
         if self.graph_in_dim != expected_dim:
-            raise ValueError(f'graph_in_dim={self.graph_in_dim}, node features are {expected_dim}-d')
+            raise ValueError(
+                f'graph_in_dim={self.graph_in_dim}, node features are {expected_dim}-d'
+            )
 
 
 @dataclass

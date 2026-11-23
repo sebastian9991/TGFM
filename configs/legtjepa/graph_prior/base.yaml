@@ -1,0 +1,78 @@
+# Graph-prior regularizer experiment (GSIGReg / GMMD vs SIGReg).
+# Model and optimizer are the best volume run (configs/legtjepa/eval/link/
+# best_volume.yaml, sweep run 63wbqufz); only the regularizer, batch sampler
+# and seed change between arms. launches/graph_prior/graph_prior.sh fills in
+# the RUN_KEY, LOG_NAME, SEED and the arm fields below with sed.
+MetaArguments:
+  log_file_path: "LOG_NAME.log"
+  node_file: ""
+  edge_file: ""
+  root_dir: "graph_clip_datasets"
+  is_scratch_location: true
+  global_seed: SEED
+  verbose: false
+ExperimentArguments:
+  exp_args:
+    RUN_KEY:
+      model_args:
+        model: "LeGTJEPA"
+        source_data: "ogbn-arxiv+arxiv_2023+pubmed+ogbn-products+reddit"
+        batch_size: 450              # per rank; 4 ranks => global 1800
+        max_text_length: 512
+        log_every_steps: 100
+
+        align_objective: "volume"
+
+        graph_in_dim: 384
+        graph_hidden_dim: 1024
+        graph_num_layers: 6
+        graph_pe_dim: 16
+        attn_type: 'multihead'
+        attn_dropout: 0.1
+
+        text_model_id: 'sentence-transformers/all-MiniLM-L6-v2'
+        freeze_text_backbone: true
+        freeze_text_projection: false
+
+        embed_dim: 384
+        proj_hidden_dim: 2048
+        proj_dropout: 0.23143496522279444
+        predictor_depth: 2
+        predictor_hidden_dim: 2048
+        predictor_dropout: 0.12322528338740824
+
+        lambda_graph: 0.004570916353326657
+        lambda_text: 0.000906247248213744
+        sigreg_num_slices: 128
+        sigreg_num_quad_points: 17
+        sigreg_t_max: 4.0
+
+        # --- arm (set by the launch script) ---
+        regularizer: "sigreg"        # sigreg | gsigreg | gmmd
+        graph_kernel: "heat"
+        graph_kernel_t: 1.0
+        graph_kernel_eps: 1.0
+        gmmd_bandwidth: 1.0
+        batch_sampler: "random"      # random | cluster
+        cluster_size: 8
+        batch_graph_stats: true      # log batch edge density in every arm
+
+        graph_aug: true
+        aug_feat_drop: 0.09985752496875984
+        aug_edge_drop: 0.34201956213611545
+
+        lr: 0.00020212590712491503
+        weight_decay: 0.0008191217475064224
+        epochs: 10
+        warmup_steps: 50
+
+        zeroshot_direction: 'text_pred'
+        device: 0
+      data_args:
+        data_name: 'source_data'
+        task_name: 'node'
+        target_data: 'cora+wikics+history'
+        test_ratio: 0.5
+        eval_batch_size: 256
+        eval_seeds: [0, 1, 2, 3, 4]
+        eval_every_epochs: 100       # no in-training eval; evaluated after

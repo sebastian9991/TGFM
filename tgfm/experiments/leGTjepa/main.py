@@ -12,13 +12,14 @@ Expects GraphCLIP's released data layout under ``model_args.data_root``:
 """
 
 import argparse
+import json
 import logging
 import math
 import os
 import time
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import torch
 import torch.distributed as dist
@@ -31,6 +32,11 @@ from tqdm.auto import tqdm
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
 from tgfm.evaluation.zero_shot_eval import zeroshot_macro
+from tgfm.models.graph_prior import (
+    ClusterBatchSampler,
+    SourceAdjacency,
+    batch_edge_stats,
+)
 from tgfm.models.legtjepa import LeGTJEPA
 from tgfm.models.losses.legtjepaloss import LeGTJEPALoss
 from tgfm.models.losses.volumeloss import LeGTJEPAVolumeLoss
@@ -41,6 +47,7 @@ from tgfm.utils.args import (
     ModelArguments,
     parse_args,
 )
+from tgfm.utils.convergence import rankme
 from tgfm.utils.logger import setup_logging
 from tgfm.utils.path import get_root_dir, get_scratch
 from tgfm.utils.process import parse_source_data  # from the GraphCLIP repo
@@ -92,23 +99,47 @@ def warmup_cosine(
     return LambdaLR(optimizer, fn)
 
 
-def load_source_graphs(meta_args: MetaArguments, model_args: ModelArguments) -> list:
+def needs_batch_graph(model_args: LeGTJEPAArguments) -> bool:
+    """The batch's induced subgraph is needed for R_G, the cluster sampler, or stats."""
+    return (
+        model_args.regularizer != 'sigreg'
+        or model_args.batch_sampler == 'cluster'
+        or model_args.batch_graph_stats
+    )
+
+
+def load_source_graphs(
+    meta_args: MetaArguments, model_args: ModelArguments
+) -> Tuple[list, Optional[SourceAdjacency]]:
+    """Source subgraphs, plus the full source-graph adjacency when needed.
+
+    Each subgraph is tagged with center_id (its centre's node id in the source
+    graph) and src_id (which source graph), so a collated batch knows which
+    edges join its centres.
+    """
     assert isinstance(model_args, LeGTJEPAArguments)
     scratch = get_scratch()
     path = scratch / str(meta_args.root_dir) / 'processed'
     graphs: list = []
+    adj = SourceAdjacency() if needs_batch_graph(model_args) else None
     for name in model_args.source_data.split('+'):
         data = torch.load(path / f'{name}.pt', weights_only=False)
-        graphs.extend(parse_source_data(name, data))
+        parsed = parse_source_data(name, data)
+        if adj is not None:
+            src = adj.add(data.edge_index, int(data.num_nodes))
+            for i, g in enumerate(parsed):
+                g.center_id = i  # parse_source_data asserts list index == node id
+                g.src_id = src
+        graphs.extend(parsed)
         logging.info(
             f'Loaded source dataset {name} (running total: {len(graphs)} subgraphs)'
         )
-    return graphs
+    return graphs, adj
 
 
 def train_epoch(
     model: DDP,
-    criterion: LeGTJEPALoss,
+    criterion: Union[LeGTJEPALoss, LeGTJEPAVolumeLoss],
     loader: DataLoader,
     tokenizer: PreTrainedTokenizerBase,
     optimizer: torch.optim.AdamW,
@@ -122,11 +153,19 @@ def train_epoch(
     log_every_steps: int,
     max_text_length: int,
     verbose: bool,
-) -> float:
-    """One pass over the rank-local shard; returns the epoch's mean loss."""
+    source_adj: Optional[SourceAdjacency] = None,
+) -> Tuple[float, Dict[str, float]]:
+    """One pass over the rank-local shard; returns the epoch's mean loss and
+    rank-local batch-graph / timing / effective-rank stats.
+    """
     assert isinstance(model_args, LeGTJEPAArguments)
     model.train()
     total_loss, num_batches = 0.0, 0
+    use_adj = model_args.regularizer != 'sigreg'
+    stats: Dict[str, List[float]] = {}
+
+    def track(key: str, value: float) -> None:
+        stats.setdefault(key, []).append(value)
 
     pbar = tqdm(
         loader,
@@ -139,6 +178,16 @@ def train_epoch(
 
     for step, batch in enumerate(pbar):
         optimizer.zero_grad(set_to_none=True)
+        is_log_step = (step + 1) % log_every_steps == 0
+
+        # Induced adjacency among this rank's centre nodes (CPU, before .to()).
+        batch_adj = None
+        if source_adj is not None:
+            t0 = time.perf_counter()
+            batch_adj = source_adj.induced(batch.center_id, batch.src_id)
+            track('adj_ms', 1e3 * (time.perf_counter() - t0))
+            for k, v in batch_edge_stats(batch_adj).items():
+                track(f'batch_{k}', v)
 
         batch_t = tokenizer(
             batch.summary,
@@ -155,8 +204,25 @@ def train_epoch(
                 batch, model_args.aug_feat_drop, model_args.aug_edge_drop
             )
 
+        def forward_loss() -> Dict[str, torch.Tensor]:
+            out = model(batch, batch_t)
+            if use_adj:
+                out['batch_adj'] = batch_adj
+            # Loss time (alignment + regularizer, forward only), synced so the
+            # GPU work is counted; only on log steps to keep the loop async.
+            if is_log_step:
+                torch.cuda.synchronize(device)
+                t0 = time.perf_counter()
+            losses = criterion(out)
+            if is_log_step:
+                torch.cuda.synchronize(device)
+                track('loss_ms', 1e3 * (time.perf_counter() - t0))
+                with torch.no_grad():
+                    track('rankme_g', rankme(out['z_g'].detach()))
+            return losses
+
         if not model_args.adversarial:
-            losses = criterion(model(batch, batch_t))
+            losses = forward_loss()
             losses['loss'].backward()
         else:
             m, eps = model_args.adv_steps, model_args.adv_step_size
@@ -164,7 +230,7 @@ def train_epoch(
             perturb = torch.empty_like(x_clean).uniform_(-eps, eps).requires_grad_()
             for i in range(m):
                 batch.x = x_clean + perturb
-                losses = criterion(model(batch, batch_t))
+                losses = forward_loss()
                 (losses['loss'] / m).backward()
                 if i < m - 1:
                     with torch.no_grad():
@@ -179,7 +245,7 @@ def train_epoch(
         total_loss += losses['loss'].detach().item()
         num_batches += 1
 
-        if global_rank == 0 and (step + 1) % log_every_steps == 0:
+        if global_rank == 0 and is_log_step:
             pbar.set_postfix(
                 {
                     'loss': f'{losses["loss"].item():.4f}',
@@ -195,7 +261,8 @@ def train_epoch(
                 f'cross={losses["cross"].item():.4f} '
                 f'sigreg_g={losses["sigreg_graph"].item():.4f} '
                 f'sigreg_t={losses["sigreg_text"].item():.4f} '
-                f"lr={scheduler.get_last_lr()[0]:.2e}"
+                f"lr={scheduler.get_last_lr()[0]:.2e} "
+                + ' '.join(f'{k}={v[-1]:.4g}' for k, v in stats.items())
             )
             if verbose:
                 if model_args.align_objective == 'volume':
@@ -207,7 +274,12 @@ def train_epoch(
                             'train/sigreg_graph': losses['sigreg_graph'].item(),
                             'train/sigreg_text': losses['sigreg_text'].item(),
                             'train/volume': losses['volume'].item(),
-                            'train/cos_align': losses['cos_align'].item(),
+                            **{
+                                f'train/{k}': v.item()
+                                for k, v in losses.items()
+                                if k.startswith('cos_')
+                            },
+                            **{f'train/{k}': v[-1] for k, v in stats.items()},
                             'train/lr': scheduler.get_last_lr()[0],
                         }
                     )
@@ -226,7 +298,8 @@ def train_epoch(
     # Average across ranks so the logged epoch loss reflects the global shard.
     loss_tensor = torch.tensor(total_loss / max(1, num_batches), device=device)
     dist.all_reduce(loss_tensor, op=dist.ReduceOp.AVG)
-    return loss_tensor.item()
+    epoch_stats = {k: sum(v) / len(v) for k, v in stats.items() if v}
+    return loss_tensor.item(), epoch_stats
 
 
 def run_legtjepa(
@@ -241,6 +314,8 @@ def run_legtjepa(
     device: torch.device,
     cpu_pg: dist.ProcessGroup,
     verbose: bool = False,
+    source_adj: Optional[SourceAdjacency] = None,
+    seed: int = 0,
 ) -> None:
     assert isinstance(model_args, LeGTJEPAArguments)
 
@@ -257,17 +332,40 @@ def run_legtjepa(
     idx_this_rank = all_idx.tensor_split(world_size)[global_rank]
     graphs_this_rank = [graphs[i] for i in idx_this_rank.tolist()]
 
-    loader = DataLoader(
-        graphs_this_rank,
-        batch_size=model_args.batch_size,
-        shuffle=True,
-        num_workers=5,
-        prefetch_factor=2,
-        persistent_workers=True,
-        drop_last=True,  # keep BatchNorm / SIGReg batch statistics stable
-    )
+    if model_args.batch_sampler == 'cluster':
+        assert source_adj is not None
+        sampler = ClusterBatchSampler(
+            source_adj,
+            center_id=torch.tensor([g.center_id for g in graphs_this_rank]),
+            src_id=torch.tensor([g.src_id for g in graphs_this_rank]),
+            batch_size=model_args.batch_size,
+            cluster_size=model_args.cluster_size,
+            seed=seed + 1000 * global_rank,
+        )
+        loader = DataLoader(
+            graphs_this_rank,
+            batch_sampler=sampler,
+            num_workers=5,
+            prefetch_factor=2,
+            persistent_workers=True,
+        )
+    else:
+        loader = DataLoader(
+            graphs_this_rank,
+            batch_size=model_args.batch_size,
+            shuffle=True,
+            num_workers=5,
+            prefetch_factor=2,
+            persistent_workers=True,
+            drop_last=True,  # keep BatchNorm / SIGReg batch statistics stable
+        )
     if global_rank == 0:
-        logging.info(f'Pre-train loader loaded.')
+        logging.info(
+            f'Pre-train loader loaded. regularizer={model_args.regularizer} '
+            f'kernel={model_args.graph_kernel} t={model_args.graph_kernel_t} '
+            f'eps={model_args.graph_kernel_eps} sampler={model_args.batch_sampler} '
+            f'cluster_size={model_args.cluster_size}'
+        )
 
     legtjepa = LeGTJEPA(model_args)
     # This should be false in all cases, but left for ablations.
@@ -336,8 +434,12 @@ def run_legtjepa(
             f'wandb_mode={wandb.run.settings.mode if wandb.run else None} '
             f'targets={data_args.target_data.split("+")}'
         )
+    stats_path = save_dir / 'train_stats.json'
+    history: list = []
+    if global_rank == 0 and stats_path.exists():
+        history = json.loads(stats_path.read_text())
     for epoch in epoch_pbar:
-        epoch_loss = train_epoch(
+        epoch_loss, epoch_stats = train_epoch(
             model=model,
             criterion=criterion,
             loader=loader,
@@ -353,11 +455,18 @@ def run_legtjepa(
             log_every_steps=model_args.log_every_steps,
             max_text_length=model_args.max_text_length,
             verbose=verbose,
+            source_adj=source_adj,
         )
 
         if global_rank == 0:
             epoch_pbar.set_postfix({'epoch_loss': f'{epoch_loss:.4f}'})
             logging.info(f'Epoch: {epoch:02d}, Loss: {epoch_loss:.4f}')
+            logging.info(
+                f'Epoch {epoch:02d} rank-0 stats: '
+                + ' '.join(f'{k}={v:.4g}' for k, v in epoch_stats.items())
+            )
+            history.append({'epoch': epoch, 'loss': epoch_loss, **epoch_stats})
+            stats_path.write_text(json.dumps(history, indent=1))
             if verbose:
                 wandb.log({'train/epoch_loss': epoch_loss, 'train/epoch': epoch})
             torch.save(
@@ -470,7 +579,7 @@ def main() -> None:
             exp_name = f'{experiment}--{run_id}' if sweep_id is not None else experiment
 
             tokenizer = AutoTokenizer.from_pretrained(model_args.text_model_id)
-            graphs = load_source_graphs(meta_args, model_args)
+            graphs, source_adj = load_source_graphs(meta_args, model_args)
 
             run_legtjepa(
                 model_args=model_args,
@@ -484,6 +593,8 @@ def main() -> None:
                 device=device,
                 cpu_pg=cpu_pg,
                 verbose=use_wandb,
+                source_adj=source_adj,
+                seed=meta_args.global_seed,
             )
     finally:
         cleanup_distributed()

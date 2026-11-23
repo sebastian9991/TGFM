@@ -28,15 +28,21 @@ Modality sets (the MM-Graph table rows), all with graph as a modality:
 At k = 2, det G = 1 - c^2 with c the cosine between the two unit columns, so the
 two-modality rows are the same objective with no triple term.
 Set align_objective='volume' in the config to select this.
+
+regularizer='gsigreg' | 'gmmd' replaces SIGReg(Z^(a)) with the graph-prior
+R_G(Z^(a)) of tgfm/models/graph_prior.py. It needs out['batch_adj'], the (B, B)
+rank-local induced adjacency of the batch's centre nodes; without it (or with
+an edgeless batch) W = I and 'gsigreg' is exactly SIGReg.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import torch
 import torch.distributed as dist
 from torch import Tensor
 from torch.nn.functional import normalize
 
+from tgfm.models.graph_prior import apply_whitening, gmmd, whitening_matrix
 from tgfm.models.sigreg import SIGReg
 from tgfm.utils.args import LeGTJEPAArguments
 
@@ -111,6 +117,18 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
             num_quad_points=args.sigreg_num_quad_points,
             t_max=args.sigreg_t_max,
         )
+        self.regularizer = getattr(args, 'regularizer', 'sigreg')
+        self.graph_kernel = getattr(args, 'graph_kernel', 'heat')
+        self.graph_kernel_t = getattr(args, 'graph_kernel_t', 1.0)
+        self.graph_kernel_eps = getattr(args, 'graph_kernel_eps', 1.0)
+        self.gmmd_bandwidth = getattr(args, 'gmmd_bandwidth', 1.0)
+
+    def reg(self, z: Tensor, W: Optional[Tensor]) -> Tensor:
+        """R(Z^a): whiten the rank-local rows, gather, then test against N(0, I)."""
+        z = gather_embeddings(apply_whitening(z, W))
+        if self.regularizer == 'gmmd':
+            return gmmd(z, self.gmmd_bandwidth)
+        return self.sigreg(z)
 
     def forward(self, out: Dict[str, Tensor]) -> Dict[str, Tensor]:
         z_g = out['z_g']
@@ -135,11 +153,20 @@ class LeGTJEPAVolumeLoss(torch.nn.Module):
         # det G is per-sample in [0, 1]: mean over batch, then over anchors.
         cross = torch.stack([d.mean() for d in dets]).mean()
 
-        sigreg_g = self.sigreg(gather_embeddings(z_g))
-        sigreg_t = self.sigreg(gather_embeddings(out['z_t'])) if self.lambda_t > 0 else zero
-        sigreg_i = (
-            self.sigreg(gather_embeddings(out['z_image'])) if self.lambda_i > 0 else zero
-        )
+        # W = K^{-1/2} from the batch graph, shared by all modalities; None = I.
+        # The B x B eigendecomposition runs in float64 on CPU (where the batch
+        # adjacency is built); consumer GPUs are slow at float64 eigh.
+        W = None
+        if self.regularizer != 'sigreg' and out.get('batch_adj') is not None:
+            W = whitening_matrix(
+                out['batch_adj'].cpu(),
+                kernel=self.graph_kernel,
+                t=self.graph_kernel_t,
+                eps=self.graph_kernel_eps,
+            )
+        sigreg_g = self.reg(z_g, W)
+        sigreg_t = self.reg(out['z_t'], W) if self.lambda_t > 0 else zero
+        sigreg_i = self.reg(out['z_image'], W) if self.lambda_i > 0 else zero
 
         lambda_tot = self.lambda_g + self.lambda_t + self.lambda_i
         assert lambda_tot <= 1
