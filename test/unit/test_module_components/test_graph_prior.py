@@ -128,3 +128,20 @@ def test_cluster_sampler_has_edges():
     clustered = batch_edge_stats(adj.induced(center[batches[0]], src[batches[0]]))
     rand = batch_edge_stats(adj.induced(torch.randperm(n)[:64], src[:64]))
     assert clustered['frac_nonisolated'] > 0.8 and clustered['edges'] > 5 * max(1, rand['edges'])
+
+
+def test_add_accepts_sparse_formats():
+    from torch_sparse import SparseTensor
+
+    e = random_graph(40, 150, 5)
+    ref = SourceAdjacency()
+    ref.add(e, 40)
+    for fmt in (
+        SparseTensor.from_edge_index(e, sparse_sizes=(40, 40)),
+        SparseTensor.from_edge_index(e, sparse_sizes=(40, 40)).t(),
+        torch.sparse_coo_tensor(e, torch.ones(e.size(1)), (40, 40)),
+    ):
+        adj = SourceAdjacency()
+        adj.add(fmt, 40)
+        assert torch.equal(adj.rowptr[0], ref.rowptr[0])
+        assert torch.equal(adj.col[0], ref.col[0])

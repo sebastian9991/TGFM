@@ -28,7 +28,7 @@ rows, then rows are gathered for the regularizer, as SIGReg already does.
 """
 
 import math
-from typing import Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import torch
 from torch import Tensor
@@ -37,6 +37,18 @@ from torch import Tensor
 # --------------------------------------------------------------------------- #
 # Source-graph adjacency and the batch's induced subgraph
 # --------------------------------------------------------------------------- #
+def as_edge_index(edge_index: Any) -> Tensor:
+    """(2, E) long tensor from a dense edge list, SparseTensor or torch sparse."""
+    if hasattr(edge_index, 'coo') and not isinstance(edge_index, Tensor):
+        row, col, _ = edge_index.coo()  # torch_sparse.SparseTensor
+        return torch.stack([row, col]).long().cpu()
+    if isinstance(edge_index, Tensor) and edge_index.is_sparse:
+        return edge_index.coalesce().indices().long().cpu()
+    if isinstance(edge_index, Tensor) and edge_index.layout == torch.sparse_csr:
+        return edge_index.to_sparse_coo().coalesce().indices().long().cpu()
+    return torch.as_tensor(edge_index).long().cpu()
+
+
 class SourceAdjacency:
     """CSR adjacency of every source graph, for induced-subgraph lookups.
 
@@ -49,9 +61,15 @@ class SourceAdjacency:
         self.col: List[Tensor] = []
         self.num_nodes: List[int] = []
 
-    def add(self, edge_index: Tensor, num_nodes: int) -> int:
-        """Register one source graph; returns its source id."""
-        ei = edge_index.long()
+    def add(self, edge_index: Any, num_nodes: int) -> int:
+        """Register one source graph; returns its source id.
+
+        edge_index may be a (2, E) tensor, a torch_sparse SparseTensor (how the
+        GraphCLIP processed source graphs store it) or a torch sparse tensor.
+        """
+        ei = as_edge_index(edge_index)
+        if ei.numel() > 0:
+            num_nodes = max(num_nodes, int(ei.max()) + 1)
         ei = torch.cat([ei, ei.flip(0)], dim=1)
         ei = ei[:, ei[0] != ei[1]]
         key = torch.unique(ei[0] * num_nodes + ei[1])
