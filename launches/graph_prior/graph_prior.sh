@@ -17,7 +17,7 @@
 # Submit from the repo root, on the br_graph_prior_sigreg branch:
 #     sbatch launches/graph_prior/graph_prior.sh
 # One arm only, e.g. all seeds of gsig_t1:   sbatch --array=6-8 launches/graph_prior/graph_prior.sh
-# Summary once tasks finish:   uv run python scripts/graph_prior_summary.py
+# Summary once tasks finish:   uv run --no-sync python scripts/graph_prior_summary.py
 #
 # Arms (name  regularizer  t  sampler):
 #   sigreg_rand    sigreg   -    random    the best volume config as is
@@ -67,7 +67,7 @@ grep -E "regularizer|graph_kernel_t|batch_sampler|global_seed|^    gprior" "$cfg
 
 # 1. Pretrain. main.py resumes from weights/<key>/legtjepa.pt if a previous
 #    attempt was cut off; delete that folder to restart from scratch.
-uv run torchrun --standalone --nproc_per_node="${SLURM_GPUS_ON_NODE:-4}" \
+uv run --no-sync torchrun --standalone --nproc_per_node="${SLURM_GPUS_ON_NODE:-4}" \
     "$ENTRY" --config-file "$cfg"
 
 # 2. Zero-shot node classification and 3. link prediction (AUC), one GPU.
@@ -75,7 +75,7 @@ uv run torchrun --standalone --nproc_per_node="${SLURM_GPUS_ON_NODE:-4}" \
 #    logs/<key>_train.log, logs/<key>_nc.log, logs/<key>_lp.log.
 sed -e "s/${key}_train.log/${key}_nc.log/" "$cfg" > "${CONF_DIR}/${key}_nc.yaml"
 sed -e "s/${key}_train.log/${key}_lp.log/" "$cfg" > "${CONF_DIR}/${key}_lp.yaml"
-uv run python tgfm/evaluation/zero_shot_eval.py --config-file "${CONF_DIR}/${key}_nc.yaml"
-uv run python tgfm/evaluation/zero_shot_link_pred.py \
+uv run --no-sync python tgfm/evaluation/zero_shot_eval.py --config-file "${CONF_DIR}/${key}_nc.yaml"
+uv run --no-sync python tgfm/evaluation/zero_shot_link_pred.py \
     --config-file "${CONF_DIR}/${key}_lp.yaml" --evaluation-method AUC
 echo "[done] ${key} $(date +%FT%T)"
